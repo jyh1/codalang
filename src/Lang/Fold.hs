@@ -2,13 +2,20 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 
 module Lang.Fold where
 
-import Lang.Types
+import           Lang.Types
 
-import RIO
-import Control.Lens (makeLenses)
+import           RIO
+import           Control.Lens                   ( makeLenses
+                                                , (+=)
+                                                , use
+                                                )
+import           RIO.State                      ( MonadState )
+import           Control.Monad.State            ( StateT )
 
 
 
@@ -21,15 +28,15 @@ class (Monad m) => CodaLangEnv m a where
     sandBox :: m a -> m a
 
 foldCoda :: (CodaLangEnv m a) => CodaVal -> m a
-foldCoda (Lit u) = lit u
-foldCoda (Var v) = var v
-foldCoda (Cl cmd) = do
+foldCoda (Lit u  ) = lit u
+foldCoda (Var v  ) = var v
+foldCoda (Cl  cmd) = do
     cmdval <- (bashcmd . traverse) foldCmdEle cmd
     cl cmdval
-    where
-        foldCmdEle :: (CodaLangEnv m a) => CmdEle CodaVal -> m (CmdEle a)
-        foldCmdEle (Val v) = Val <$> (sandBox (foldCoda v))
-        foldCmdEle (Verbatim t) = return (Verbatim t)
+  where
+    foldCmdEle :: (CodaLangEnv m a) => CmdEle CodaVal -> m (CmdEle a)
+    foldCmdEle (Val      v) = Val <$> (sandBox (foldCoda v))
+    foldCmdEle (Verbatim t) = return (Verbatim t)
 foldCoda (Dir bndl sub) = do
     root <- foldCoda bndl
     dir root sub
@@ -58,3 +65,11 @@ class HasEnv a b | a -> b where
     envL :: Lens a a (VarMap b) (VarMap b)
 instance HasEnv (LangRecord a) a where
     envL = env
+
+class (MonadState s m, HasCounter s) => GetCounter s m where
+    getCounter :: m Int
+    getCounter = do
+        counterL += 1
+        use counterL
+
+instance (Monad m) => GetCounter (LangRecord a) (StateT (LangRecord a) m)

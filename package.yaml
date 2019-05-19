@@ -24,6 +24,7 @@ dependencies:
 - rio >= 0.1.8.0
 - lens
 - typed-process
+- mtl
 
 ghc-options:
 - -Wall
