@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -9,10 +8,11 @@ module Lang.Fold where
 
 import           Lang.Types
 
-import           RIO hiding (Lens, lens)
+import           RIO                     hiding ( Lens
+                                                , lens
+                                                )
 import           Control.Lens
 import           RIO.State                      ( MonadState )
-import           Control.Monad.State            ( StateT )
 
 
 
@@ -26,32 +26,20 @@ class (Monad m) => CodaLangEnv m a where
 -- data type
 type VarMap a = Map VarName a
 
-data LangRecord a = LangEnv {_counter :: Int, _env :: VarMap a}
-
-makeLenses ''LangRecord
-
-initEnv :: LangRecord a
-initEnv = LangEnv 0 mempty
 
 class HasCounter a where
     counterL :: Lens a a Int Int
 instance HasCounter Int where
     counterL = id
-instance HasCounter (LangRecord a) where
-    counterL = counter
 
 class HasEnv a b | a -> b where
     envL :: Lens a a (VarMap b) (VarMap b)
-instance HasEnv (LangRecord a) a where
-    envL = env
 
 class (MonadState s m, HasCounter s) => GetCounter s m where
     getCounter :: m Int
     getCounter = do
         counterL += 1
         use counterL
-
-instance (Monad m) => GetCounter (LangRecord a) (StateT (LangRecord a) m)
 
 class (MonadState s m, HasEnv s b) => LocalVar s m b where
     withVar :: VarName -> b -> m a -> m a
