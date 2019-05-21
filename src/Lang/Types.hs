@@ -17,7 +17,10 @@ newtype UUID = UUID Integer
     deriving (Eq, Ord, Read)
 
 instance Show UUID where
-    show (UUID n) = "0x" ++ showHex n ""
+    show (UUID n) = "0x" ++ zeros ++ showHex n ""
+        where
+            shown = showHex n ""
+            zeros = replicate (32 - length shown) '0'
 
 type VarName = Text
 
