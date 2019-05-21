@@ -11,10 +11,12 @@ module Lang.RCO
 where
 -- remove complex operations
     -- bundle := Var var | dirRCO
-    -- cmdRCO := Cmd bundle
-    -- dirRCO := Dir bundle text
-    -- letRCO := Let var (cmdRCO | dirRCO | Lit id) rco
-    -- rco := bundle | letRCO
+    -- str := string | var
+    -- value := bundle | str
+    -- cmdRCO := Cmd value
+    -- dirRCO := Dir (bundle | lit) text
+    -- letRCO := Let var (cmdRCO | dirRCO | lit | str) rco
+    -- rco := value | letRCO
 
 import           Control.Monad.State            ( StateT
                                                 , evalStateT
@@ -57,11 +59,12 @@ runRCO :: CodaVal -> CodaVal
 runRCO cdvl = foldr (uncurry Let) bndl binds
   where
     foldApp :: RCOPass Bundle
-    foldApp        = foldCoda cdvl >>= toBundle
+    foldApp        = foldCoda cdvl >>= toValue
     RCO binds bndl = evalStateT foldApp (RCOState 0 mempty S.Empty)
 
 
 type Bundle = CodaVal
+type Value = CodaVal
 type CmdRCO = Cmd Bundle
 
 -- cmdRCO | dirRCO | Lit id
@@ -70,7 +73,7 @@ type LetRhs = CodaVal
 type NameBinding = (Text, LetRhs)
 type NameBindings = S.Seq NameBinding
 type Path = S.Seq Text
-data RCOVal = RCOLit UUID | RCOVar VarName | RCOCmd CmdRCO | RCODir VarName Path
+data RCOVal = RCOLit UUID | RCOVar VarName | RCOCmd CmdRCO | RCODir VarName Path | RCOStr Text
 data RCO a = RCO NameBindings a
     deriving (Show, Eq, Read, Functor)
 instance (Applicative RCO) where
@@ -102,15 +105,17 @@ fromRCODir n path = foldl Dir (Var n) path
 
 toVarName :: RCOVal -> RCOPass VarName
 toVarName (RCOLit uuid         ) = bindName (Lit uuid)
+toVarName (RCOStr t) = bindName (Str t)
 toVarName (RCOVar varn         ) = return varn
 toVarName (RCOCmd cmd          ) = bindName (Cl cmd)
 toVarName (RCODir bname subdirs) = bindName (fromRCODir bname subdirs)
 
-toBundle :: RCOVal -> RCOPass Bundle
-toBundle (RCODir bname subdirs) = return $ case subdirs of
+toValue :: RCOVal -> RCOPass Value
+toValue (RCODir bname subdirs) = return $ case subdirs of
     S.Empty -> Var bname
     _       -> foldl Dir (Var bname) subdirs
-toBundle rest = Var <$> toVarName rest
+toValue (RCOStr t) = return (Str t)
+toValue rest = Var <$> toVarName rest
 
 toSubDir :: RCOVal -> RCOPass (VarName, Path)
 toSubDir (RCODir bname subdirs) = return (bname, subdirs)
@@ -120,6 +125,7 @@ toSubDir rest                   = do
 
 instance CodaLangEnv RCOPass RCORes where
     lit uuid = return (RCOLit uuid)
+    str t = return (RCOStr t)
     var v = use (envL . at v . to (RCOVar . fromMaybe errmsg))
       where
         errmsg =
@@ -127,8 +133,8 @@ instance CodaLangEnv RCOPass RCORes where
                 (  "The impossible happened: undefined variable in RCO: "
                 ++ T.unpack v
                 )
-    cl (Bash cmd) = RCOCmd <$> rcocmd
-        where rcocmd = Bash <$> (traverse . cmdEleVal) toBundle cmd
+    cl (Run cmd) = RCOCmd <$> rcocmd
+        where rcocmd = Run <$> traverse toValue cmd
     dir val subdir = do
         (newn, path) <- toSubDir val
         return (RCODir newn (path S.|> subdir))

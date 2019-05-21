@@ -23,10 +23,7 @@ runCmd env cmd = do
 
 
 buildCmd :: ExecCmd -> (String, String)
-buildCmd (Bash es) = ("run", T.unpack (T.intercalate " " (displayEle <$> es)))
-    where
-        displayEle (Verbatim e) = e
-        displayEle (Val e) = e
+buildCmd (Run es) = ("run", T.unpack (T.intercalate " " es))
 
 buildEnv :: Env -> [String]
 buildEnv es = envStr <$> es

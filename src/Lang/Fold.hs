@@ -19,6 +19,7 @@ import           RIO.State                      ( MonadState )
 class (Monad m) => CodaLangEnv m a where
     lit :: UUID -> m a
     var :: VarName -> m a
+    str :: Text -> m a
     cl :: Cmd a -> m a
     dir :: a -> Text -> m a
     clet :: VarName -> a -> m a -> m a
@@ -53,8 +54,9 @@ class (MonadState s m, HasEnv s b) => LocalVar s m b where
 foldCoda :: (CodaLangEnv m a, LocalVar s m b) => CodaVal -> m a
 foldCoda (Lit u  ) = lit u
 foldCoda (Var v  ) = var v
+foldCoda (Str s) = str s
 foldCoda (Cl  cmd) = do
-    cmdval <- (bashcmd . traverse . cmdEleVal) foldCoda cmd
+    cmdval <- (runcmd . traverse) foldCoda cmd
     cl cmdval
 foldCoda (Dir bndl sub) = do
     root <- foldCoda bndl

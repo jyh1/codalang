@@ -8,8 +8,6 @@ module Lang.Types where
 import           RIO
 import           Numeric                        ( showHex )
 import           Control.Lens                   ( makeLenses
-                                                , Prism
-                                                , prism
                                                 )
 
 -- UUID of CodaLab bundle
@@ -25,16 +23,8 @@ instance Show UUID where
 type VarName = Text
 
 -- Codalab command
-data CmdEle a = Verbatim Text | Val a
-    deriving (Eq, Ord, Read, Show, Functor)
 
-cmdEleVal :: Prism (CmdEle a) (CmdEle b) a b
-cmdEleVal = prism Val getVal
-  where
-    getVal (Val      a) = Right a
-    getVal (Verbatim t) = Left (Verbatim t)
-
-newtype Cmd a = Bash {_bashcmd :: [CmdEle a]}
+newtype Cmd a = Run {_runcmd :: [a]}
     deriving (Eq, Ord, Read, Show, Functor)
 
 makeLenses ''Cmd
@@ -49,6 +39,7 @@ type Env = [(Text, Text)]
 data CodaVal = Lit UUID
     | Var VarName
     | Cl CodaCmd
+    | Str Text
     | Dir CodaVal Text
     | Let VarName CodaVal CodaVal
     deriving (Eq, Ord, Read, Show)
