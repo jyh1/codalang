@@ -44,23 +44,21 @@ instance HasEnv RCOState RCOEnvVal where
 
 instance (Monad m) => GetCounter RCOState (StateT RCOState m)
 
-instance LocalVar RCOState RCOPass Text where
-    withVar varn val app = do
-        oldEnv <- use envL
-        context %= (S.|> varn)
-        (envL . at varn) ?= val
-        res <- app
-        envL .= oldEnv
-        context %= \(most S.:|> _) -> most
-        return res
+instance LocalVar RCOState RCOPass Text
 
+withLocal :: Text -> RCOPass a -> RCOPass a
+withLocal v app = do
+    context %= (S.|> v)
+    val <- app
+    context %= (\(most S.:|> _) -> most)
+    return val
 -- lang rco
 runRCO :: CodaVal -> CodaVal
 runRCO cdvl = foldr (uncurry Let) bndl binds
   where
     foldApp :: RCOPass Bundle
     foldApp        = foldCoda cdvl >>= toValue
-    RCO binds bndl = evalStateT foldApp (RCOState 0 mempty S.Empty)
+    RCO binds bndl = evalStateT foldApp (RCOState 0 mempty mempty)
 
 
 type Bundle = CodaVal
@@ -90,10 +88,13 @@ type RCOPass = StateT RCOState RCO
 -- utility functions
 
 newTmpName :: RCOPass VarName
-newTmpName = use (context . to getName)
+newTmpName = do
+    suff <- getCounter
+    stems <- use (context . to getName)
+    return (T.intercalate "-" (stems ++ [tshow suff]))
   where
-    getName S.Empty = tmpName
-    getName cs      = T.intercalate "-" (toList cs)
+    getName S.Empty = [tmpName]
+    getName cs      = toList cs
 
 bindName :: LetRhs -> RCOPass VarName
 bindName cv = do
@@ -139,8 +140,8 @@ instance CodaLangEnv RCOPass RCORes where
         (newn, path) <- toSubDir val
         return (RCODir newn (path S.|> subdir))
     clet vname val body = do
-        newns <- toVarName val
-        withVar newns vname body
+        newns <- withLocal vname (val >>= toVarName)
+        withVar vname newns body
 
 
 

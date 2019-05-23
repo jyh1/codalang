@@ -22,7 +22,7 @@ class (Monad m) => CodaLangEnv m a where
     str :: Text -> m a
     cl :: Cmd a -> m a
     dir :: a -> Text -> m a
-    clet :: VarName -> a -> m a -> m a
+    clet :: VarName -> m a -> m a -> m a
 
 -- data type
 type VarMap a = Map VarName a
@@ -63,6 +63,5 @@ foldCoda (Cl  cmd) = do
 foldCoda (Dir bndl sub) = do
     root <- foldCoda bndl
     dir root sub
-foldCoda (Let varname val body) = do
-    val' <- foldCoda val
-    clet varname val' (foldCoda body)
+foldCoda (Let varname val body) = 
+    clet varname (foldCoda val) (foldCoda body)
