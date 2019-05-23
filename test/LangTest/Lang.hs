@@ -10,6 +10,7 @@ module LangTest.Lang where
 
 import Lang.Types
 import Lang.Fold
+import Lang.RCO
 
 import RIO
 import qualified RIO.Text as T
@@ -18,6 +19,7 @@ import RIO.List (foldl, repeat)
 import Test.QuickCheck hiding (Result)
 import Control.Monad.State
 import Control.Lens hiding (elements, lens)
+
 
 -- random generation
 
@@ -140,3 +142,31 @@ randCodaVal = do
 
 instance Arbitrary CodaVal where
   arbitrary = sized (\d -> evalStateT (snd <$> randCodaVal) (VarEnv mempty d))
+
+
+-- short functions for writing expression
+
+instance IsString CodaVal where
+  fromString = Var . T.pack
+
+instance Num CodaVal where
+  fromInteger = Lit . UUID
+
+s :: Text -> CodaVal
+s = Str
+v :: VarName -> CodaVal
+v = Var
+c :: CodaCmd -> CodaVal
+c = Cl
+r = Cl . Run
+d :: CodaVal -> [Text] -> CodaVal
+d = foldl Dir
+clet :: CodaVal -> [(Text, CodaVal)] -> CodaVal
+clet = foldr (uncurry Let)
+tmpN :: Int -> Text
+tmpN n = tmpName <> "-" <> tshow n
+tmpNV :: Int -> CodaVal
+tmpNV = Var . tmpN
+
+testRCO :: CodaVal -> CodaVal
+testRCO = runRCO
