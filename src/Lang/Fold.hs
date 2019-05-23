@@ -35,6 +35,8 @@ instance HasCounter Int where
 
 class HasEnv a b | a -> b where
     envL :: Lens a a (VarMap b) (VarMap b)
+instance HasEnv (VarMap a) a where
+    envL = id
 
 class (MonadState s m, HasCounter s) => GetCounter s m where
     getCounter :: m Int

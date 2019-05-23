@@ -46,3 +46,6 @@ data CodaVal = Lit UUID
 
 tmpName :: Text
 tmpName = "codalang"
+
+data CodaType = TypeString | TypeBundle
+    deriving (Eq, Ord, Read, Show)

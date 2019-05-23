@@ -58,6 +58,7 @@ tests:
     dependencies:
     - codalang
     - hspec
+    - QuickCheck
 
     ghc-options:
     - -threaded
