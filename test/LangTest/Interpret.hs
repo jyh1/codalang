@@ -12,7 +12,6 @@ module LangTest.Interpret(testInterpret) where
 import RIO hiding (to)
 import Control.Lens
 import qualified RIO.Text as T
-import RIO.List (sort)
 import Control.Monad.State
 
 import Lang.Types
@@ -40,8 +39,9 @@ instance CodaLangEnv InterApp CodaTestRes where
             errmsg = error ("Undefined var in test interpreter: " ++ T.unpack v)
     cl (Run cmd) = do
         -- logging run command
-        cmdlog %= (cmd :)
-        return (RunRes cmd)
+        cmd' <- sequence cmd
+        cmdlog %= (cmd' :)
+        return (RunRes cmd')
     dir val sub = return $ case val of
         DirRes v subs -> DirRes v (subs ++ [sub])
         other -> DirRes other [sub]
@@ -51,8 +51,7 @@ instance CodaLangEnv InterApp CodaTestRes where
 
 -- return logs of runned command and final result
 testInterpret :: CodaVal -> ([[CodaTestRes]], CodaTestRes)
--- evaluation order could be changed after rco: ex. (r [r [r [Str "x"]], r[r [Str "m"]]])
-testInterpret cv = (sort (_cmdlog env), res)
+testInterpret cv = (_cmdlog env, res)
     where
         app :: InterApp CodaTestRes
         app = foldCoda cv

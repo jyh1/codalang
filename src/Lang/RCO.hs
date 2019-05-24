@@ -135,7 +135,7 @@ instance CodaLangEnv RCOPass RCORes where
                 ++ T.unpack v
                 )
     cl (Run cmd) = RCOCmd <$> rcocmd
-        where rcocmd = Run <$> traverse toValue cmd
+        where rcocmd = Run <$> traverse (>>= toValue) cmd
     dir val subdir = do
         (newn, path) <- toSubDir val
         return (RCODir newn (path S.|> subdir))

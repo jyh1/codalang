@@ -10,6 +10,7 @@ import           Lang.Types
 
 import           RIO                     hiding ( Lens
                                                 , lens
+                                                , over
                                                 )
 import           Control.Lens
 import           RIO.State                      ( MonadState )
@@ -20,7 +21,7 @@ class (Monad m) => CodaLangEnv m a where
     lit :: UUID -> m a
     var :: VarName -> m a
     str :: Text -> m a
-    cl :: Cmd a -> m a
+    cl :: Cmd (m a) -> m a
     dir :: a -> Text -> m a
     clet :: VarName -> m a -> m a -> m a
 
@@ -58,7 +59,7 @@ foldCoda (Lit u  ) = lit u
 foldCoda (Var v  ) = var v
 foldCoda (Str s) = str s
 foldCoda (Cl  cmd) = do
-    cmdval <- (runcmd . traverse) foldCoda cmd
+    let cmdval = over (runcmd . mapped) foldCoda cmd
     cl cmdval
 foldCoda (Dir bndl sub) = do
     root <- foldCoda bndl
