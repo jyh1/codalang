@@ -11,7 +11,7 @@ import           Control.Lens                   ( makeLenses
                                                 )
 
 -- UUID of CodaLab bundle
-newtype UUID = UUID Integer
+newtype UUID = UUID {unuuid :: Integer}
     deriving (Eq, Ord, Read)
 
 instance Show UUID where

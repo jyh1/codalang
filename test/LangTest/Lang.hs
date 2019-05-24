@@ -8,6 +8,8 @@
 
 module LangTest.Lang where
 
+import LangTest.Interpret (testInterpret)
+
 import Lang.Types
 import Lang.Fold
 import Lang.RCO
@@ -218,3 +220,13 @@ checkRCO :: CodaVal -> Bool
 checkRCO v = case isRCO v of 
   Right _ -> True
   Left s -> error s
+
+dummyInterpret = testInterpret
+
+testprint :: CodaVal -> Text
+testprint (Let vn val body) = T.concat ["let (", vn, " = ", testprint val, ") in ", testprint body]
+testprint (Dir k d) = T.concat [testprint k, "/", d]
+testprint (Lit n) = tshow (unuuid n)
+testprint (Var v) = v
+testprint (Str v) = v
+testprint (Cl (Run cmd)) = T.concat ["{", T.intercalate ", " (testprint <$> cmd), "}"]

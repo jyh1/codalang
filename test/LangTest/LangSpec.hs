@@ -37,5 +37,7 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
         simpRCOTest (clet (simpRun "bb") [("bb", 2)]) ((clet (tmpNV 2) [("bb-1", 2), (tmpN 2, (simpRun "bb-1"))]))
         simpRCOTest (clet (simpRun "k") [("k", d 2 ["a"])]) 
             (clet (tmpNV 3) [("k-1", 2 ), ("k-2", d "k-1" ["a"]), (tmpN 3, simpRun "k-2")])
-    it "random_gen_RCO" $ property $
+    it "random_gen_RCO" $ property
         (\(RandCoda _ cv) -> checkRCO (testRCO cv))
+    it "same_result_after_RCO" $ property
+        (\(RandCoda _ cv) -> dummyInterpret (testRCO cv) == dummyInterpret cv)
