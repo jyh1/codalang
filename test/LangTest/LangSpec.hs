@@ -8,7 +8,6 @@ import Test.QuickCheck
 import RIO
 
 import LangTest.Lang
-import Lang.Types
 import qualified RIO.Text as T
 
 
@@ -18,7 +17,7 @@ langSpec = rcoSpec
 rcoSpec :: Spec
 rcoSpec = describe "RCO(remove_complex_operation)" $ do
     let simpRCOTest c v = testRCO c `shouldBe` v
-        simpRCOTestSame c = simpRCOTest c c
+        -- simpRCOTestSame c = simpRCOTest c c
     it "simple_let" $ do
         simpRCOTest (clet "x" [("x", 2)]) (clet "x-1" [("x-1", 2)])
         simpRCOTest (clet "x" [("x", 2), ("x", 3)]) (clet "x-2" [("x-1", 2), ("x-2", 3)])
@@ -38,3 +37,5 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
         simpRCOTest (clet (simpRun "bb") [("bb", 2)]) ((clet (tmpNV 2) [("bb-1", 2), (tmpN 2, (simpRun "bb-1"))]))
         simpRCOTest (clet (simpRun "k") [("k", d 2 ["a"])]) 
             (clet (tmpNV 3) [("k-1", 2 ), ("k-2", d "k-1" ["a"]), (tmpN 3, simpRun "k-2")])
+    it "random_gen_RCO" $ property $
+        (\(RandCoda _ cv) -> checkRCO (testRCO cv))

@@ -101,7 +101,7 @@ randCl = Cl <$> randCmd
   where
     randCmd :: GenEnv CodaCmd
     randCmd = do
-      cmdeles <- (`replicate` (snd <$> randCodaVal)) <$> lift (choose (1, 10))
+      cmdeles <- (`replicate` (snd <$> randCodaVal)) <$> lift (choose (1, 6))
       geneles <- zipWithM ($) reduceDepth cmdeles
       return (Run geneles)
       where
@@ -140,8 +140,13 @@ randCodaVal = do
     randType :: GenEnv CodaType
     randType = lift (elements [TypeString, TypeBundle])
 
-instance Arbitrary CodaVal where
-  arbitrary = sized (\d -> evalStateT (snd <$> randCodaVal) (VarEnv mempty d))
+data RandCoda = RandCoda CodaType CodaVal
+    deriving (Show, Read, Eq)
+
+instance Arbitrary RandCoda where
+  arbitrary = uncurry RandCoda <$> sized sizeGen
+    where
+      sizeGen dep = evalStateT randCodaVal (VarEnv mempty (min 15 dep))
 
 
 -- short functions for writing expression
@@ -149,8 +154,11 @@ instance Arbitrary CodaVal where
 instance IsString CodaVal where
   fromString = Var . T.pack
 
+instance Num UUID where
+  fromInteger = UUID
+
 instance Num CodaVal where
-  fromInteger = Lit . UUID
+  fromInteger = Lit . fromInteger
 
 s :: Text -> CodaVal
 s = Str
@@ -170,3 +178,43 @@ tmpNV = Var . tmpN
 
 testRCO :: CodaVal -> CodaVal
 testRCO = runRCO
+
+type RCOCheck = CodaVal -> Either String ()
+showError :: Show a => String -> a -> Either String b
+showError t val = Left (t <> ": " <> show val)
+-- RCO specification
+isBundle :: RCOCheck
+isBundle (Var _) = return ()
+-- isBundle (Dir v _) = isDir v
+isBundle v = showError "isBundle" v
+
+isStr :: RCOCheck
+isStr (Str _) = return ()
+isStr v = showError "isStr" v
+
+isValue :: RCOCheck
+isValue x = msum [isBundle x, isStr x, showError "isValue" x]
+
+isCMD :: RCOCheck
+isCMD (Cl (Run as)) = msum (isValue <$> as)
+isCMD v = showError "isCMD" v
+
+isDir :: RCOCheck
+isDir (Dir v _) = isBundle v `mplus` isLit v
+isDir v = showError "isDir" v
+
+isLit :: RCOCheck
+isLit (Lit _) = return ()
+isLit v = showError "isLit" v
+
+isLet :: RCOCheck
+isLet (Let _ val body) = msum ((($ val) <$> [isCMD, isDir, isLit, isStr]) ++ [isRCO body])
+isLet v = showError "isLet" v
+
+isRCO :: RCOCheck
+isRCO v = isValue v `mplus` isLet v
+
+checkRCO :: CodaVal -> Bool
+checkRCO v = case isRCO v of 
+  Right _ -> True
+  Left s -> error s
