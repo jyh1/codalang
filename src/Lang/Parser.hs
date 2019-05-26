@@ -119,7 +119,7 @@ codaExpr :: (TokenParsing m) => m ParseRes
 codaExpr = dirExpr
 
 codaParser :: Parser CodaVal
-codaParser = fromParseRes <$> codaExpr
+codaParser = fromParseRes <$> (spaces *> codaExpr)
 
 loadFile :: (MonadIO m) => String -> m (Maybe CodaVal)
 loadFile = parseFromFile codaParser

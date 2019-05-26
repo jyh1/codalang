@@ -25,11 +25,11 @@ parseSpec = describe "CodaVal_parser" $ do
         parseSucc "aa" "aa"
         parseSucc "\"string\"" (s "string")
     it "parened_expr" $ do
-        parseSucc "(0x000000000005)" 5
+        parseSucc "  (0x000000000005)" 5
         parseSucc "(aa)" "aa"
-        parseSucc "((aa))" "aa"
+        parseSucc "  ((aa))" "aa"
         parseSucc "(((((((aa)))))))" "aa"
-        parseSucc "(((aa)))/bb/c" (d "aa" ["bb", "c"])
+        parseSucc "  (((aa)))/bb/c" (d "aa" ["bb", "c"])
         parseSucc "(((aa)))//bb/c" (d "aa" ["", "bb", "c"])
         parseSucc "(((aa))/)//bb/c" (d "aa" ["", "", "bb", "c"])
         parseSucc "(((aa/))/)//bb/c" (d "aa" ["", "", "", "bb", "c"])
@@ -41,7 +41,7 @@ parseSpec = describe "CodaVal_parser" $ do
         parseSucc "(aa/run.py, bb, \"cc\")" (r [aapy, "bb", s "cc"])
     it "simple_let_expr" $ do
         parseSucc "let x = y in x" (clet "x" [("x", "y")])
-        parseSucc "let x=0x02 in x" (clet "x" [("x", 2)])
+        parseSucc "  let x=0x02 in x" (clet "x" [("x", 2)])
         parseSucc "let x=(aa/run.py,) in y" (clet "y" [("x", aapyCmd)])
         parseSucc "let x =  (aa/run.py); y=(aa/run.py,) in (x, y)" (clet (r ["x", "y"]) [("x", aapy), ("y", aapyCmd)])
     it "nested_let_expr" $ do
