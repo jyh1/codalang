@@ -9,11 +9,13 @@
 module LangTest.Lang where
 
 import LangTest.Interpret (testInterpret)
+import LangTest.RandPrint (randomPrintCoda)
 
 import Lang.Types
 import Lang.Fold
 import Lang.RCO
 import Lang.Parser
+
 
 import RIO
 import qualified RIO.Text as T
@@ -143,14 +145,24 @@ randCodaVal = do
     randType :: GenEnv CodaType
     randType = lift (elements [TypeString, TypeBundle])
 
+randoCodaValWithDep :: Int -> Gen (CodaType, CodaVal)
+randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 2 dep))
+
 data RandCoda = RandCoda CodaType CodaVal
     deriving (Show, Read, Eq)
 
 instance Arbitrary RandCoda where
-  arbitrary = uncurry RandCoda <$> sized sizeGen
-    where
-      sizeGen dep = evalStateT randCodaVal (VarEnv mempty (min 15 dep))
+  arbitrary = uncurry RandCoda <$> sized randoCodaValWithDep
 
+-- parser test
+-- | randomly print a codaval AST, the parser should be able to parse back
+data ParserTest = ParserTest CodaVal String
+    deriving (Show, Read, Eq)
+instance Arbitrary ParserTest where
+  arbitrary = do
+    (_, randCv) <- sized randoCodaValWithDep
+    randStr <- randomPrintCoda randCv
+    return (ParserTest randCv randStr)
 
 -- short functions for writing expression
 

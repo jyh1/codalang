@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | random print an CodaVal to be parsed back
-module LangTest.RandPrint where
+module LangTest.RandPrint(randomPrintCoda) where
 
 import Lang.Types
 
@@ -10,43 +10,76 @@ import RIO
 import RIO.List
 import qualified RIO.Text as T
 import Test.QuickCheck hiding (Result)
+import Control.Lens (_1)
 
 data RendCoda = Parens RendCoda 
+    | Parens1 RendCoda
+    -- the outmost pair of parens without space
+    | TightParens RendCoda
+    -- must insert one pair of parens with no space
+    | TightParens1 RendCoda
     | Spaces RendCoda
+    | Space1 RendCoda
     | RLis [RendCoda]
-    | RStr String
-    | Symbol String
+    | RStr Text
+    | Symbol Text
     | RLit UUID
+    | RLet [RendCoda] RendCoda
     deriving (Show, Read, Eq, Ord)
 
 -- | symbol that could be surrounded with spaces
-spaceSymbol :: String -> RendCoda
+spaceSymbol, space1Symbol :: Text -> RendCoda
 spaceSymbol = Spaces . Symbol
+space1Symbol = Space1 . spaceSymbol
+
+entity :: RendCoda -> RendCoda
+entity = Parens . Spaces
+
+entSym :: Text -> RendCoda
+entSym = entity . Symbol
+
 
 doRend :: RendCoda -> Gen String
-doRend (RLit u) = return $ show u
-doRend (RStr s) = return $ show s
-doRend (RLis as) = concat <$> mapM doRend as
-doRend (Symbol s) = return s
-doRend (Spaces r) = doRend r >>= encloseSpaces
-doRend (Parens r) = parens r >>= doRend
+doRend rc = case rc of
+    RLit u -> return $ show u
+    RStr s -> return $ show s
+    RLis as -> concat <$> mapM doRend as
+    Symbol s -> return (T.unpack s)
+    Spaces r -> doRend r >>= encloseSpaces
+    Space1 r -> doRend (RLis [Symbol " ", r, Symbol " "])
+    Parens r -> do
+        dep <- choose (0, 3)
+        doRend (nTimes dep Parens1 r)
+    Parens1 r -> doRend (RLis [spaceSymbol "(", r, spaceSymbol ")"])
+    TightParens r -> do
+        flag <- coin
+        doRend $ bool (rmSpace r) (TightParens1 (Parens r)) flag
+    TightParens1 r -> doRend (RLis [Symbol "(", r, Symbol ")"])
+    RLet as body -> case as of
+        [] -> doRend body
+        _ -> do
+            (picked, rest) <- splitLists as
+            newAs <- insertSemi (spaceSymbol ";") picked
+            doRend (RLis (concat [[space1Symbol "let"], newAs, [space1Symbol "in", RLet rest body]]))
+    where
+        nTimes :: Int -> (a -> a) -> (a -> a)
+        nTimes 0 _ = id
+        nTimes 1 f = f
+        nTimes n f = f . nTimes (n-1) f
+        rmSpace :: RendCoda -> RendCoda
+        rmSpace (Parens r) = rmSpace r
+        rmSpace (Spaces r) = rmSpace r
+        rmSpace (Parens1 r) = TightParens1 (rmSpace r)
+        rmSpace rest = rest
 
 
-splitLists :: [a] -> Gen [[a]]
-splitLists [] = return []
+splitLists :: [a] -> Gen ([a], [a])
+splitLists [] = return ([], [])
 splitLists as = do
     k <- choose (1, len)
-    let (fs, rs) = splitAt k as
-    liftM (fs : ) (splitLists rs)
+    return (splitAt k as)
     where
         len = length as
-
-sepEndBy :: a -> [a] -> Gen [a]
-sepEndBy sep ss = do
-    coin <- choose (True, False)
-    if coin then return newStr else return (newStr ++ [sep])
-    where
-        newStr = intersperse sep ss
 
 insertComma :: a -> [a] -> [a]
 insertComma sep as = case as of
@@ -54,32 +87,48 @@ insertComma sep as = case as of
     [a] -> [a, sep]
     _ -> intersperse sep as
 
+insertSemi :: a -> [a] -> Gen [a]
+insertSemi sep as = case as of
+    [] -> error "Empty list"
+    _ -> do
+        let inserted = intersperse sep as
+        bool (inserted ++ [sep]) inserted <$> coin
+        
+coin :: Gen Bool
+coin = choose (False, True)
 -- | random white characters
 spaces :: Gen String
-spaces = listOf space
+spaces = resize 2 (listOf space)
     where
         space = elements "\t \n"
 
 encloseSpaces :: String -> Gen String
 encloseSpaces s = liftA2 (\s1 s2 -> s1 ++ s ++ s2) spaces spaces
 
-parens :: RendCoda -> Gen RendCoda
-parens g = do
-    dep <- choose (0, 5)
-    let opens = replicate dep (spaceSymbol "(")
-        closes = replicate dep (spaceSymbol ")")
-    return (RLis (opens ++ [g] ++ closes))
+rendCoda :: CodaVal -> RendCoda
+rendCoda cv = case cv of
+    Lit u -> entity (RLit u)
+    Var v -> entSym v
+    Cl (Run rs) -> entity (Parens1 (RLis rendLis))
+        where
+            rendRs = rendCoda <$> rs
+            rendLis = insertComma sep rendRs
+            sep = spaceSymbol ","
+    Str s -> entity (RStr s)
+    Dir b ps -> entity (RLis [rendB, dirSep, rendP])
+        where
+            rendB = TightParens (rendCoda b)
+            rendP = Symbol ps
+            dirSep = Symbol "/"
+    Let{} -> uncurry RLet (getLetLis cv)
+        where
+            getLetLis :: CodaVal -> ([RendCoda], RendCoda)
+            getLetLis (Let v1 val1 body1) =
+                let 
+                    enwAs = RLis [entSym v1, spaceSymbol "=", rendCoda val1]
+                in
+                    over _1 (enwAs:) (getLetLis body1)
+            getLetLis other = ([], rendCoda other)
 
-
-
-
--- tokenStr :: String -> Gen String
--- tokenStr s = token (return s)
-
--- rendCmd :: CodaCmd -> Gen String
--- rendCmd (Run cs) = case length cs of
---     1 -> 
-
--- rendVal :: CodaVal -> Gen String
--- rendVal (Lit u) = tokenStr (show u)
--- rendVal (Var v) = tokenStr (T.unpack v)
+randomPrintCoda :: CodaVal -> Gen String
+randomPrintCoda = doRend . rendCoda
