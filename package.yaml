@@ -25,6 +25,8 @@ dependencies:
 - lens
 - typed-process
 - mtl
+- trifecta
+- parsers
 
 ghc-options:
 - -Wall
