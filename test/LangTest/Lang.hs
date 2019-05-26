@@ -13,6 +13,7 @@ import LangTest.Interpret (testInterpret)
 import Lang.Types
 import Lang.Fold
 import Lang.RCO
+import Lang.Parser
 
 import RIO
 import qualified RIO.Text as T
@@ -230,3 +231,6 @@ testprint (Lit n) = tshow (unuuid n)
 testprint (Var v) = v
 testprint (Str v) = v
 testprint (Cl (Run cmd)) = T.concat ["{", T.intercalate ", " (testprint <$> cmd), "}"]
+
+testParse :: String -> Maybe CodaVal
+testParse = loadString
