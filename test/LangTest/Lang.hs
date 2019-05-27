@@ -61,9 +61,9 @@ randVar = lift $ frequency [
 randVarName :: Gen Text
 randVarName = 
   let alpha = choose ('a', 'z')
-      num = choose ('0', '9')
+      varSymbol = elements ("." ++ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'])
   in
-    T.pack <$> liftA2 (:) alpha (listOf (oneof [alpha, num]))
+    T.pack <$> liftA2 (:) alpha (resize 1 (listOf varSymbol))
 
 randLeaf :: CodaType -> GenEnv CodaVal
 randLeaf c = case c of
@@ -78,7 +78,9 @@ randLeaf c = case c of
         [] -> oneof others
         _ -> oneof ((Var <$> elements vs) : others)
     strLeaf :: GenEnv CodaVal
-    strLeaf = genLeaf TypeString [Str <$> randVarName]
+    strLeaf = genLeaf TypeString [Str <$> randStr]
+        where
+          randStr = T.pack <$> (resize 5 (listOf arbitraryASCIIChar))
     bundleLeaf :: GenEnv CodaVal
     bundleLeaf = genLeaf TypeBundle [Lit <$> arbitrary]
 
@@ -146,7 +148,7 @@ randCodaVal = do
     randType = lift (elements [TypeString, TypeBundle])
 
 randoCodaValWithDep :: Int -> Gen (CodaType, CodaVal)
-randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 2 dep))
+randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 15 dep))
 
 data RandCoda = RandCoda CodaType CodaVal
     deriving (Show, Read, Eq)

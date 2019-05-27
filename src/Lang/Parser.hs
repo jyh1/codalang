@@ -103,7 +103,7 @@ stringExpr = PStr <$> stringLiteral
 dirExpr :: (TokenParsing m) => m ParseRes
 dirExpr = highlight LiterateSyntax (token dirParse) <?> "codalang expression"
   where
-    filename = T.pack <$> many (noneOf "/\\?%*:|\"><';(),{}[]")
+    filename = T.pack <$> many (noneOf "/\\?%*:|\"><';(),{}[]\r\n\t ")
     dirSep   = highlight ReservedOperator (char '/' <?> "path seperator")
     makeDir :: (ParseRes, Maybe [Text]) -> ParseRes
     makeDir (e1, Nothing) = e1

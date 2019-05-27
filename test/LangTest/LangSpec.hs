@@ -48,6 +48,13 @@ parseSpec = describe "CodaVal_parser" $ do
         parseSucc "let x = let y = 0x1 in y in x" (clet "x" [("x", clet "y" [("y", 1)])])
         parseSucc "(let x = 0x0002 in x/a/b, let x=0x01; y= \" x\" in (x, y)/x)"
             (r [clet (d "x" ["a", "b"]) [("x", 2)], clet (d (r ["x", "y"]) ["x"]) [("x", 1), ("y", s " x")]])
+    parserQuickCheck
+
+-- randomly generate codaval and randomly serilize to string, parser sould be able to parse it back
+parserQuickCheck :: Spec
+parserQuickCheck = describe "parser_quick_check" $ 
+    it "parse back from randomly printed string" $ property $
+        quickCheckWith stdArgs{ maxSuccess = 300 } (\(ParserTest cv cvStr) -> testParse cvStr == (Just cv))
 
 rcoSpec :: Spec
 rcoSpec = describe "RCO(remove_complex_operation)" $ do

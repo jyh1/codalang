@@ -10,7 +10,7 @@ import RIO
 import RIO.List
 import qualified RIO.Text as T
 import Test.QuickCheck hiding (Result)
-import Control.Lens (_1)
+import Control.Lens (_1, _last)
 
 data RendCoda = Parens RendCoda 
     | Parens1 RendCoda
@@ -70,6 +70,10 @@ doRend rc = case rc of
         rmSpace (Parens r) = rmSpace r
         rmSpace (Spaces r) = rmSpace r
         rmSpace (Parens1 r) = TightParens1 (rmSpace r)
+        rmSpace (RLis as) = case as of
+            [] -> RLis []
+            _ -> RLis (over _last rmSpace as)
+        rmSpace ras@RLet{} = TightParens1 ras
         rmSpace rest = rest
 
 
@@ -125,7 +129,7 @@ rendCoda cv = case cv of
             getLetLis :: CodaVal -> ([RendCoda], RendCoda)
             getLetLis (Let v1 val1 body1) =
                 let 
-                    enwAs = RLis [entSym v1, spaceSymbol "=", rendCoda val1]
+                    enwAs = RLis [spaceSymbol v1, spaceSymbol "=", rendCoda val1]
                 in
                     over _1 (enwAs:) (getLetLis body1)
             getLetLis other = ([], rendCoda other)
