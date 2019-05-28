@@ -15,7 +15,7 @@ import RIO.List (zipWith, repeat)
 import Control.Monad.State
 import Control.Lens
 import Data.Text.Prettyprint.Doc
-import Data.Text.Prettyprint.Doc.Render.Text
+import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
 
 data Anno = DirAnno | Keyword | VarAnno Text Int | LitAnno | StrAnno | RunAnno | LetAnno | StmtAnno
     deriving (Show, Read, Eq, Ord)
@@ -46,13 +46,13 @@ ranno a d = return (anno a d)
 
 toAnnoDoc :: PPrint -> AnnoDoc
 toAnnoDoc (Value d) = d
-toAnnoDoc (PLet as body) = annotate LetAnno (sep [defs, body])
+toAnnoDoc (PLet as body) = annotate LetAnno (hang 3 (sep [defs, body]))
     where
         keyword = annotate Keyword
         keylet = keyword "let"
         keyin = keyword "in"
         asdoc = sep (punctuate semi as)
-        defs = sep [hang 4 (sep [keylet, asdoc]), keyin]
+        defs = align (sep [hang 4 (sep [keylet, asdoc]), keyin])
 
 toAnnoDocWithParen :: PPrint -> AnnoDoc
 toAnnoDocWithParen pval = case pval of
@@ -99,7 +99,7 @@ codaToDoc cv = toAnnoDoc res
         res = runIdentity (evalStateT app (PPState 0 mempty))
 
 pprintCodaWidth :: Int -> CodaVal -> Text
-pprintDocWidth n cv = renderStrict (layoutSmart opt doc)
+pprintCodaWidth n cv = renderStrict (layoutSmart opt doc)
     where
         doc = codaToDoc cv
         opt = LayoutOptions (AvailablePerLine n 1)
