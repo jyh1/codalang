@@ -18,7 +18,8 @@ instance Show UUID where
     show (UUID n) = "0x" ++ zeros ++ showHex n ""
         where
             shown = showHex n ""
-            zeros = replicate (32 - length shown) '0'
+            -- zeros = replicate (32 - length shown) '0'
+            zeros = ""
 
 type VarName = Text
 

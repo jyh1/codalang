@@ -27,6 +27,7 @@ dependencies:
 - mtl
 - trifecta
 - parsers
+- prettyprinter
 
 ghc-options:
 - -Wall
