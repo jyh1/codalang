@@ -15,6 +15,8 @@ langSpec :: Spec
 langSpec = do
     parseSpec
     rcoSpec
+    pprintSpec
+    typeCheckSpec
 
 parseSpec :: Spec
 parseSpec = describe "CodaVal_parser" $ do
@@ -65,6 +67,11 @@ pprintSpec = describe "pretty-printer test" $ do
     testPrinter "full width" testPPrint
     testPrinter "default width" testPPrintShow
     testPrinter "compact" testPPrintCompact
+
+typeCheckSpec :: Spec
+typeCheckSpec = describe "type-checker test" $ do
+    it "pass type check in random generated ast" $ property $
+        (\(RandCoda ct cv) -> testTypeCheck cv `shouldBe` Right ct) 
 
 rcoSpec :: Spec
 rcoSpec = describe "RCO(remove_complex_operation)" $ do

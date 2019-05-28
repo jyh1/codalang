@@ -16,6 +16,7 @@ import Lang.Fold
 import Lang.RCO
 import Lang.Parser
 import Lang.PPrint
+import Lang.TypeCheck(typeCheck)
 import Data.Text.Prettyprint.Doc.Render.Text(renderStrict)
 import Data.Text.Prettyprint.Doc (layoutCompact)
 
@@ -261,3 +262,6 @@ testPPrintShow = show . codaToDoc
 
 testPPrintCompact :: CodaVal -> String
 testPPrintCompact cv = T.unpack (renderStrict (layoutCompact (codaToDoc cv)))
+
+testTypeCheck :: CodaVal -> Either Text CodaType
+testTypeCheck = typeCheck
