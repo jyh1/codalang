@@ -15,6 +15,9 @@ import Lang.Types
 import Lang.Fold
 import Lang.RCO
 import Lang.Parser
+import Lang.PPrint
+import Data.Text.Prettyprint.Doc.Render.Text(renderStrict)
+import Data.Text.Prettyprint.Doc (layoutCompact)
 
 
 import RIO
@@ -248,3 +251,13 @@ testprint (Cl (Run cmd)) = T.concat ["{", T.intercalate ", " (testprint <$> cmd)
 
 testParse :: String -> Maybe CodaVal
 testParse = loadString
+
+
+testPPrint :: CodaVal -> String
+testPPrint = T.unpack . pprintCoda
+
+testPPrintShow :: CodaVal -> String
+testPPrintShow = show . codaToDoc
+
+testPPrintCompact :: CodaVal -> String
+testPPrintCompact cv = T.unpack (renderStrict (layoutCompact (codaToDoc cv)))

@@ -56,6 +56,16 @@ parserQuickCheck = describe "parser_quick_check" $
     it "parse back from randomly printed string" $ property $
         quickCheckWith stdArgs{ maxSuccess = 300 } (\(ParserTest cv cvStr) -> testParse cvStr == (Just cv))
 
+-- pprint should be parsed back to the same AST
+pprintSpec :: Spec
+pprintSpec = describe "pretty-printer test" $ do
+    let testPrinter tag printer = 
+            it tag $ property $
+                (\(RandCoda _ cv) -> testParse (printer cv) `shouldBe` Just cv) 
+    testPrinter "full width" testPPrint
+    testPrinter "default width" testPPrintShow
+    testPrinter "compact" testPPrintCompact
+
 rcoSpec :: Spec
 rcoSpec = describe "RCO(remove_complex_operation)" $ do
     let simpRCOTest c v = testRCO c `shouldBe` v
