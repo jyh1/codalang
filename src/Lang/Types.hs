@@ -17,7 +17,7 @@ newtype UUID = UUID {unuuid :: Integer}
 instance Show UUID where
     show (UUID n) = "0x" ++ zeros ++ showHex n ""
         where
-            shown = showHex n ""
+            -- shown = showHex n ""
             -- zeros = replicate (32 - length shown) '0'
             zeros = ""
 
