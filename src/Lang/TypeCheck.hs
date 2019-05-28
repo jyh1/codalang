@@ -13,7 +13,7 @@ import           RIO.List                       ( unzip )
 
 import           Lang.Types
 import           Lang.Fold
-import           Lang.PPrint                    ( pprintCompact )
+import           Lang.PPrint                    ( pprintCoda )
 
 data TypeErrorInfo = UnDef
     | Mismatch {expected :: CodaType, current :: CodaType}
@@ -29,9 +29,10 @@ instance Show TypeError where
         Mismatch ex curr -> T.unlines
             [ "Expected type: " <> tshow ex
             , "Actual type: " <> tshow curr
-            , "In the expression: " <> astStr
+            , "In the expression: "
+            , astStr
             ]
-        where astStr = pprintCompact ast
+        where astStr = pprintCoda ast
 
 
 type TCState = Map VarName CodaType

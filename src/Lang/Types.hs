@@ -49,4 +49,8 @@ tmpName :: Text
 tmpName = "codalang"
 
 data CodaType = TypeString | TypeBundle
-    deriving (Eq, Ord, Read, Show)
+    deriving (Eq, Ord, Read)
+
+instance Show CodaType where
+    show TypeString = "String"
+    show TypeBundle = "{_}"
