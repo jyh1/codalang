@@ -31,7 +31,6 @@ newtype Cmd a = Run {_runcmd :: [a]}
 makeLenses ''Cmd
 
 type CodaCmd = Cmd CodaVal
-type ExecCmd = Cmd Text
 
 -- Command options
 type Env = [(Text, Text)]
@@ -50,7 +49,12 @@ tmpName = "codalang"
 
 data CodaType = TypeString | TypeBundle
     deriving (Eq, Ord, Read)
-
 instance Show CodaType where
     show TypeString = "String"
     show TypeBundle = "{_}"
+
+data CodaResult = ResStr Text | ResBundle UUID
+    deriving (Eq, Ord, Read, Show)
+
+data Execute = ExecRun [(Text, Text)] [Text]
+    deriving (Show, Read, Eq)
