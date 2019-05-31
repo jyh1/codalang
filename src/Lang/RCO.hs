@@ -14,7 +14,7 @@ where
     -- str := string | var
     -- value := bundle | str
     -- cmdRCO := Cmd value
-    -- dirRCO := Dir (bundle | lit) text
+    -- dirRCO := Dir bundle text
     -- letRCO := Let var (cmdRCO | dirRCO | lit | str) rco
     -- rco := value | letRCO
 

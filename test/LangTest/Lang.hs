@@ -205,9 +205,11 @@ showError :: Show a => String -> a -> Either String b
 showError t val = Left (t <> ": " <> show val)
 -- RCO specification
 isBundle :: RCOCheck
-isBundle (Var _) = return ()
--- isBundle (Dir v _) = isDir v
-isBundle v = showError "isBundle" v
+isBundle v = msum [isDir v, isVar v]
+
+isVar :: RCOCheck
+isVar (Var _) = return ()
+isVar v = showError "isVar" v
 
 isStr :: RCOCheck
 isStr (Str _) = return ()
@@ -217,11 +219,11 @@ isValue :: RCOCheck
 isValue x = msum [isBundle x, isStr x, showError "isValue" x]
 
 isCMD :: RCOCheck
-isCMD (Cl (Run as)) = msum (isValue <$> as)
+isCMD (Cl (Run as)) = sequence_ (isValue <$> as)
 isCMD v = showError "isCMD" v
 
 isDir :: RCOCheck
-isDir (Dir v _) = isBundle v `mplus` isLit v
+isDir (Dir v _) = isBundle v
 isDir v = showError "isDir" v
 
 isLit :: RCOCheck
@@ -229,7 +231,7 @@ isLit (Lit _) = return ()
 isLit v = showError "isLit" v
 
 isLet :: RCOCheck
-isLet (Let _ val body) = msum ((($ val) <$> [isCMD, isDir, isLit, isStr]) ++ [isRCO body])
+isLet (Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr]), isRCO body]
 isLet v = showError "isLet" v
 
 isRCO :: RCOCheck
