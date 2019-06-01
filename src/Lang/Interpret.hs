@@ -15,16 +15,6 @@ import           Control.Lens
 
 import           Lang.Types
 
-data Deps a = Deps a [Text]
-    deriving (Show, Read, Eq)
-
-class (Monad m) => Exec m a where
-    clRun :: Text -> Map Text (Deps a) -> [Text] -> m a
-    clLit :: Text -> UUID -> m a
-
-data RuntimeRes a = RuntimeString Text | RuntimeBundle a [Text]
-    deriving (Show, Read, Eq)
-
 type RunEnv a = Map Text (RuntimeRes a)
 type RunCoda m a = StateT (RunEnv a) m (RuntimeRes a)
 

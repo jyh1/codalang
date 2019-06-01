@@ -2,6 +2,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Lang.Types where
 
@@ -62,3 +65,13 @@ data Execute = ExecRun [(Text, Text)] [Text]
 
 buildPath :: [Text] -> Text
 buildPath = T.intercalate "/"
+
+data Deps a = Deps a [Text]
+    deriving (Show, Read, Eq)
+
+class (Monad m) => Exec m a where
+    clRun :: Text -> Map Text (Deps a) -> [Text] -> m a
+    clLit :: Text -> UUID -> m a
+
+data RuntimeRes a = RuntimeString Text | RuntimeBundle a [Text]
+    deriving (Show, Read, Eq)
