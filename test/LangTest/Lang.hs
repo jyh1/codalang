@@ -22,6 +22,7 @@ import Data.Text.Prettyprint.Doc (layoutCompact)
 
 
 import RIO
+import RIO.List (delete)
 import qualified RIO.Text as T
 import qualified RIO.Map as M
 import RIO.List (foldl, repeat)
@@ -84,7 +85,7 @@ randLeaf c = case c of
     strLeaf :: GenEnv CodaVal
     strLeaf = genLeaf TypeString [Str <$> randStr]
         where
-          randStr = T.pack <$> (resize 5 (listOf arbitraryASCIIChar))
+          randStr = (T.pack . delete '/') <$> (resize 5 (listOf arbitraryASCIIChar))
     bundleLeaf :: GenEnv CodaVal
     bundleLeaf = genLeaf TypeBundle [Lit <$> arbitrary]
 
