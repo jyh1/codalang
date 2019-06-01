@@ -8,7 +8,7 @@
 
 module LangTest.Lang where
 
-import LangTest.Interpret (testInterpret)
+import LangTest.Interpret (testInterpret, testInterpretWIntrfc)
 import LangTest.RandPrint (randomPrintCoda)
 
 import Lang.Types
@@ -244,6 +244,7 @@ checkRCO v = case isRCO v of
   Left s -> error s
 
 dummyInterpret = testInterpret
+dummyInterpretWIntfrc = testInterpretWIntrfc
 
 testprint :: CodaVal -> Text
 testprint (Let vn val body) = T.concat ["let (", vn, " = ", testprint val, ") in ", testprint body]

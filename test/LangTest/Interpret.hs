@@ -5,17 +5,21 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module LangTest.Interpret(testInterpret) where
+module LangTest.Interpret(testInterpret, testInterpretWIntrfc) where
 
 -- a dummy interpreter for CodaVal for testing purpose
 
-import RIO hiding (to)
+import RIO hiding (to, view, traceShow)
 import Control.Lens
 import qualified RIO.Text as T
 import Control.Monad.State
+import RIO.List.Partial (head, tail)
+import qualified RIO.Map as M
+import Debug.Trace (traceShow)
 
 import Lang.Types
 import Lang.Fold
+import Lang.Interpret
 
 data CodaTestRes = BunRes UUID | RunRes Int | DirRes CodaTestRes [Text] | StrRes Text | VarRes Text
     deriving (Show, Read, Eq, Ord)
@@ -64,3 +68,44 @@ testInterpret cv = (_cmdlog env, res)
         app :: InterApp CodaTestRes
         app = foldCoda cv
         (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0))
+
+-- use interpret interface (after RCO)
+instance Exec InterApp CodaTestRes where
+    clRun _ deps cmd = do
+        cmdlog %= (LogRun resCmd :)
+        c <- getCounter
+        return (RunRes c)
+        where
+            resCmd = parseEle <$> cmd
+            parseEle ele
+                -- | traceShow eleDep False = undefined 
+                -- | length paths == 1 = StrRes ele
+                | otherwise = case eleDep of
+                    Nothing -> StrRes ele
+                    Just d -> fromDep d elePath
+                where
+                    paths = T.split (== '/') ele
+                    eleVar = head paths
+                    elePath = tail paths
+                    eleDep = view (at eleVar) deps
+            fromDep (Deps tres depPath) elePath
+                | null ps = tres
+                | otherwise = case tres of
+                    DirRes r sub -> DirRes r (sub ++ ps)
+                    otherwise -> DirRes tres ps
+                where
+                    ps = depPath ++ elePath
+    clLit _ u = return (BunRes u)
+
+testInterpretWIntrfc :: CodaVal -> ([CmdLog CodaTestRes], CodaTestRes)
+testInterpretWIntrfc cv = (_cmdlog env, newRes)
+    where
+        app :: InterApp (RuntimeRes CodaTestRes)
+        app = evalCoda cv
+        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0))
+        newRes = case res of
+            RuntimeString t -> StrRes t
+            RuntimeBundle m ps -> case (m, ps) of
+                (DirRes r rps, _) -> DirRes r (rps ++ ps)
+                (other, []) -> other
+                (other, ps) -> DirRes other ps

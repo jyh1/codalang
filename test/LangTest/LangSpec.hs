@@ -17,6 +17,7 @@ langSpec = do
     rcoSpec
     pprintSpec
     typeCheckSpec
+    interpretInterface
 
 parseSpec :: Spec
 parseSpec = describe "CodaVal_parser" $ do
@@ -100,3 +101,9 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
         (\(RandCoda _ cv) -> checkRCO (testRCO cv))
     it "same_result_after_RCO" $ property
         (\(RandCoda _ cv) -> dummyInterpret (testRCO cv) == dummyInterpret cv)
+
+interpretInterface :: Spec
+interpretInterface = do
+    it "same_result_with_two_interpreters" $ property
+        (\(RandCoda _ cv) -> 
+            let rcoCV = testRCO cv in dummyInterpret rcoCV == dummyInterpretWIntfrc rcoCV)
