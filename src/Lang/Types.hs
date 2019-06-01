@@ -6,6 +6,7 @@
 module Lang.Types where
 
 import           RIO
+import qualified RIO.Text as T
 import           Numeric                        ( showHex )
 import           Control.Lens                   ( makeLenses
                                                 )
@@ -58,3 +59,6 @@ data CodaResult = ResStr Text | ResBundle UUID
 
 data Execute = ExecRun [(Text, Text)] [Text]
     deriving (Show, Read, Eq)
+
+buildPath :: [Text] -> Text
+buildPath = T.intercalate "/"
