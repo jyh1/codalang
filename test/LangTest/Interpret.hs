@@ -80,19 +80,17 @@ instance Exec InterApp CodaTestRes where
             parseEle ele
                 -- | traceShow eleDep False = undefined 
                 -- | length paths == 1 = StrRes ele
-                | otherwise = case eleDep of
-                    Nothing -> StrRes ele
-                    Just d -> fromDep d elePath
-                where
-                    paths = T.split (== '/') ele
-                    eleVar = head paths
-                    elePath = tail paths
-                    eleDep = view (at eleVar) deps
+                | otherwise = case ele of
+                    Plain t -> StrRes t
+                    BundleRef eleVar ps -> 
+                        let eleDep = view (at eleVar . to (fromMaybe undefined)) deps in 
+                            fromDep eleDep ps
+                            
             fromDep (Deps tres depPath) elePath
                 | null ps = tres
                 | otherwise = case tres of
                     DirRes r sub -> DirRes r (sub ++ ps)
-                    otherwise -> DirRes tres ps
+                    _ -> DirRes tres ps
                 where
                     ps = depPath ++ elePath
     clLit _ u = return (BunRes u)

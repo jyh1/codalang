@@ -69,8 +69,11 @@ buildPath = T.intercalate "/"
 data Deps a = Deps a [Text]
     deriving (Show, Read, Eq)
 
+data CMDEle = Plain Text | BundleRef Text [Text]
+    deriving (Show, Read, Eq)
+
 class (Monad m) => Exec m a where
-    clRun :: Text -> Map Text (Deps a) -> [Text] -> m a
+    clRun :: Text -> Map Text (Deps a) -> [CMDEle] -> m a
     clLit :: Text -> UUID -> m a
 
 data RuntimeRes a = RuntimeString Text | RuntimeBundle a [Text]

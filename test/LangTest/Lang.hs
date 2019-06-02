@@ -85,7 +85,7 @@ randLeaf c = case c of
     strLeaf :: GenEnv CodaVal
     strLeaf = genLeaf TypeString [Str <$> randStr]
         where
-          randStr = (T.pack . delete '/') <$> (resize 5 (listOf arbitraryASCIIChar))
+          randStr = T.pack <$> (resize 5 (listOf arbitraryASCIIChar))
     bundleLeaf :: GenEnv CodaVal
     bundleLeaf = genLeaf TypeBundle [Lit <$> arbitrary]
 

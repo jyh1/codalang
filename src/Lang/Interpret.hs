@@ -44,15 +44,15 @@ prepLetRhs vn cv = case cv of
         lift (emptyBundle <$> clRun vn depRep txtCmd)
       where
         prepCmdEle ele = case ele of
-            Str t -> return (t, [])
+            Str t -> return (Plain t, [])
             Var v -> do
                 vres <- lookupVar v
                 return $ case vres of
-                    RuntimeString s    -> (s, [])
-                    RuntimeBundle b ps -> (v, [(v, Deps b ps)])
+                    RuntimeString s    -> (Plain s, [])
+                    RuntimeBundle b ps -> (BundleRef v [], [(v, Deps b ps)])
             Dir{} -> do
                 (v, vpath) <- dirRootLookup dirRoot
-                return (buildPath (dirRoot : path), [(dirRoot, Deps v vpath)])
+                return (BundleRef dirRoot path, [(dirRoot, Deps v vpath)])
                 where (dirRoot, path) = getPath [] ele
             _ -> error "Impossible happened: arguments in run"
     Dir{} -> runCoda cv
