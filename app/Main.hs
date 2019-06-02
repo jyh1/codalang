@@ -2,8 +2,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main (main) where
 
-import Import
+import Types
+import RIO
 import Run
+import RunCmd
 import RIO.Process
 import Options.Applicative.Simple
 import qualified Paths_codalang
@@ -19,14 +21,16 @@ main = do
                  <> short 'v'
                  <> help "Verbose output?"
                   )
+      <*> argument str (metavar "FILE")
     )
     empty
   lo <- logOptionsHandle stderr (optionsVerbose options)
   pc <- mkDefaultProcessContext
   withLogFunc lo $ \lf ->
     let app = App
-          { appLogFunc = lf
-          , appProcessContext = pc
-          , appOptions = options
+          { _appLogFunc = lf
+          , _appProcessContext = pc
+          , _appOptions = options
+          , _appClCmd = cmdExec
           }
      in runRIO app run

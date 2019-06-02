@@ -15,7 +15,9 @@ import           Lang.Lang
 
 -- | Command line arguments
 data Options = Options
-  { optionsVerbose :: !Bool
+  { 
+    optionsVerbose :: !Bool
+    , optionsSourceFile :: String
   }
 
 data App = App
@@ -23,7 +25,6 @@ data App = App
   , _appProcessContext :: !ProcessContext
   , _appOptions :: !Options
   , _appClCmd :: Execute -> IO UUID
-  , _appSourceFile :: String
   }
 
 makeLenses ''App
