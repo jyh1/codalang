@@ -1,8 +1,17 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module Types where
 
-import RIO
-import RIO.Process
+import           RIO                     hiding ( view )
+import           RIO.Process
+import qualified RIO.Map                       as M
+import           Control.Lens
+
+import           Lang.Lang
 
 -- | Command line arguments
 data Options = Options
@@ -10,13 +19,31 @@ data Options = Options
   }
 
 data App = App
-  { appLogFunc :: !LogFunc
-  , appProcessContext :: !ProcessContext
-  , appOptions :: !Options
-  -- Add other app-specific configuration information here
+  { _appLogFunc :: !LogFunc
+  , _appProcessContext :: !ProcessContext
+  , _appOptions :: !Options
+  , _appClCmd :: Execute -> IO UUID
+  , _appSourceFile :: String
   }
 
+makeLenses ''App
+
 instance HasLogFunc App where
-  logFuncL = lens appLogFunc (\x y -> x { appLogFunc = y })
+  logFuncL = appLogFunc
 instance HasProcessContext App where
-  processContextL = lens appProcessContext (\x y -> x { appProcessContext = y })
+  processContextL = appProcessContext
+
+
+instance Exec (RIO App) Text where
+  clLit _ u = return (tshow u)
+  clRun _ depMap cmd = do
+    clcmd <- view appClCmd
+    tshow <$> liftIO (clcmd execCmd)
+   where
+    fromEle e = case e of
+      Plain t        -> t
+      BundleRef r ps -> buildPath (r : ps)
+    cmdTxt = fromEle <$> cmd
+    fromDep (Deps u subs) = buildPath (u : subs)
+    depTxt  = M.toList (fromDep <$> depMap)
+    execCmd = ExecRun depTxt cmdTxt
