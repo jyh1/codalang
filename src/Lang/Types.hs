@@ -55,7 +55,10 @@ instance Show CodaType where
 data CodaResult = ResStr Text | ResBundle UUID
     deriving (Eq, Ord, Read, Show)
 
-data Execute = ExecRun [(Text, Text)] [Text]
+data ClOption = ClName Text
+    deriving (Show, Read, Eq)
+
+data Execute = ExecRun [(Text, Text)] [Text] [ClOption]
     deriving (Show, Read, Eq)
 
 buildPath :: [Text] -> Text

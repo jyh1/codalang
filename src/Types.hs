@@ -69,4 +69,4 @@ instance Exec (RIO App) Text where
     cmdTxt = fromEle <$> cmd
     fromDep (Deps u subs) = buildPath (u : subs)
     depTxt  = M.toList (fromDep <$> depMap)
-    execCmd = ExecRun depTxt cmdTxt
+    execCmd = ExecRun depTxt cmdTxt [ClName vn]
