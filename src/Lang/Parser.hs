@@ -6,6 +6,7 @@ module Lang.Parser
     ( loadFile
     , loadString
     , codaParser
+    , byteToUUID
     )
 where
 
@@ -129,5 +130,18 @@ loadFile = parseFromFile codaParser
 
 loadString :: String -> Maybe CodaVal
 loadString inp = case parseString codaParser mempty inp of
+    Success a -> Just a
+    Failure _ -> Nothing
+
+-- parse UUID from command line output
+uuidParser :: Parser UUID
+uuidParser = do
+    u <- bundleLit
+    case u of
+        PLit x -> pure (UUID x)
+        _ -> unexpected "not a uuid"
+
+byteToUUID :: ByteString -> Maybe UUID
+byteToUUID inp = case parseByteString uuidParser mempty inp of
     Success a -> Just a
     Failure _ -> Nothing

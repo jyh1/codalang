@@ -7,15 +7,15 @@ import RIO
 import qualified RIO.Text as T
 import qualified System.Process.Typed as P
 
-import Lang.Types
+import Lang.Lang
 
 cmdExec :: Execute -> IO UUID
 cmdExec (ExecRun env cmd) = do
     (res, _) <- P.readProcess_ process
-    let resstr = T.unpack (decodeUtf8Lenient (toStrictBytes res))
-    case readMaybe resstr of
-        Just uuid -> return (UUID uuid)
-        _ -> throwString "No valid UUID returned!"
+    let resstr = toStrictBytes res
+    case byteToUUID resstr of
+        Just uuid -> return uuid
+        Nothing -> throwString "No valid UUID returned!"
     where
         (subcmd, cmdstr) = buildRunCmd cmd
         envstr = buildEnv env
