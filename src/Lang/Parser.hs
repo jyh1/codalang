@@ -23,8 +23,9 @@ import           Text.Parser.Char               ( char )
 import           Text.Parser.Token.Highlight
 import           Text.Trifecta
 import           Control.Lens                   ( _2 )
+import           Data.Char                      (isSpace)
 
-data ParseRes = PLit Integer
+data ParseRes = PLit Text
     | PVar Text
     | PStr Text
     | PLet [(Text, ParseRes)] ParseRes
@@ -46,7 +47,9 @@ fromParseRes res = case res of
 
 bundleLit :: (TokenParsing m) => m ParseRes
 bundleLit = highlight Constant uuidlit
-    where uuidlit = token ((char '0' *> (PLit <$> hexadecimal)) <?> "UUID")
+    where 
+        bundleName = T.pack <$> (char '0' *> char 'x' *> some hexDigit)
+        uuidlit = token ((PLit <$> bundleName) <?> "UUID or bundle name")
 
 varChar :: (TokenParsing m) => m Char
 varChar = alphaNum <|> oneOf "_."

@@ -10,20 +10,15 @@ module Lang.Types where
 
 import           RIO
 import qualified RIO.Text as T
-import           Numeric                        ( showHex )
 import           Control.Lens                   ( makeLenses
                                                 )
 
 -- UUID of CodaLab bundle
-newtype UUID = UUID {unuuid :: Integer}
+newtype UUID = UUID {unuuid :: Text}
     deriving (Eq, Ord, Read)
 
 instance Show UUID where
-    show (UUID n) = "0x" ++ zeros ++ showHex n ""
-        where
-            -- shown = showHex n ""
-            -- zeros = replicate (32 - length shown) '0'
-            zeros = ""
+    show (UUID n) = "0x" ++ T.unpack n
 
 type VarName = Text
 

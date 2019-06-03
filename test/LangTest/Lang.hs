@@ -19,6 +19,7 @@ import Lang.PPrint
 import Lang.TypeCheck(typeCheck)
 import Data.Text.Prettyprint.Doc.Render.Text(renderStrict)
 import Data.Text.Prettyprint.Doc (layoutCompact)
+import           Numeric                        ( showHex )
 
 
 import RIO
@@ -40,7 +41,7 @@ makeLenses ''VarEnv
 type GenEnv = StateT VarEnv Gen
 
 instance Arbitrary UUID where
-  arbitrary = (UUID . abs) <$> (resize (2^40) arbitrary)
+  arbitrary = (fromInteger . abs) <$> resize (2^40) arbitrary
 
 instance HasEnv VarEnv CodaType where
   envL = varenv
@@ -177,7 +178,7 @@ instance IsString CodaVal where
   fromString = Var . T.pack
 
 instance Num UUID where
-  fromInteger = UUID
+  fromInteger n = UUID (T.pack (showHex n ""))
 
 instance Num CodaVal where
   fromInteger = Lit . fromInteger
@@ -189,6 +190,7 @@ v = Var
 c :: CodaCmd -> CodaVal
 c = Cl
 r = Cl . Run
+l = Lit . UUID
 d :: CodaVal -> [Text] -> CodaVal
 d = foldl Dir
 clet :: CodaVal -> [(Text, CodaVal)] -> CodaVal
