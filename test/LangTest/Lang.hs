@@ -127,6 +127,11 @@ randLet t = do
   body <- decDepth (withVar varName vt (randTree t))
   return (Let varName val body)
 
+randConvert :: CodaType -> GenEnv CodaVal
+randConvert t = do
+  (_, val) <- decDepth randCodaVal
+  return (Convert val t)
+
 randTree :: CodaType -> GenEnv CodaVal
 randTree t = do
   n <- use depth
@@ -138,10 +143,10 @@ randTree t = do
   where
     -- non leaf bundle type
     randBundle :: GenEnv CodaVal
-    randBundle = oneofGenEnv [randCl, randDir, randLet typeBundle]
+    randBundle = oneofGenEnv [randCl, randDir, randLet typeBundle, randConvert typeBundle]
     -- non leaf string
     randString :: GenEnv CodaVal
-    randString = randLet TypeString
+    randString = oneofGenEnv [randLet TypeString, randConvert TypeString]
 
 
 randCodaVal :: GenEnv (CodaType, CodaVal)
@@ -154,7 +159,7 @@ randCodaVal = do
     randType = lift (elements [TypeString, typeBundle])
 
 randoCodaValWithDep :: Int -> Gen (CodaType, CodaVal)
-randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 15 dep))
+randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 5 dep))
 
 data RandCoda = RandCoda CodaType CodaVal
     deriving (Show, Read, Eq)
@@ -199,6 +204,10 @@ tmpN :: Int -> Text
 tmpN n = tmpName <> "-" <> tshow n
 tmpNV :: Int -> CodaVal
 tmpNV = Var . tmpN
+bd = BundleDic . M.fromList
+cv = Convert
+ts = TypeString
+emptBd = BundleDic mempty
 
 testRCO :: CodaVal -> CodaVal
 testRCO = runRCO

@@ -9,6 +9,7 @@ import Lang.Types
 import RIO
 import RIO.List
 import qualified RIO.Text as T
+import qualified RIO.Map as M
 import Test.QuickCheck hiding (Result)
 import Control.Lens (_1, _last)
 
@@ -25,6 +26,8 @@ data RendCoda = Parens RendCoda
     | Symbol Text
     | RLit UUID
     | RLet [RendCoda] RendCoda
+    | CommaAnnot RendCoda RendCoda
+    | RType CodaType
     deriving (Show, Read, Eq, Ord)
 
 -- | symbol that could be surrounded with spaces
@@ -61,6 +64,13 @@ doRend rc = case rc of
             (picked, rest) <- splitLists as
             newAs <- insertSemi (spaceSymbol ";") picked
             doRend (RLis (concat [[space1Symbol "let"], newAs, [space1Symbol "in", RLet rest body]]))
+    CommaAnnot val anot -> doRend (RLis [val, spaceSymbol ":", anot])
+    RType ct -> case ct of
+        TypeString -> doRend (spaceSymbol "String")
+        BundleDic dic -> doRend (enloseParen "{" "}" (RLis annotComma))
+            where
+                annotLis = [CommaAnnot (spaceSymbol k) (RType v) | (k, v) <- M.toList dic]
+                annotComma = intersperse (spaceSymbol ",") annotLis
     where
         nTimes :: Int -> (a -> a) -> (a -> a)
         nTimes 0 _ = id
@@ -74,7 +84,9 @@ doRend rc = case rc of
             [] -> RLis []
             _ -> RLis (over _last rmSpace as)
         rmSpace ras@RLet{} = TightParens1 ras
+        rmSpace ras@CommaAnnot{} = TightParens1 ras
         rmSpace rest = rest
+        enloseParen ll lr cont = RLis [spaceSymbol ll, cont, spaceSymbol lr]
 
 
 splitLists :: [a] -> Gen ([a], [a])
@@ -124,7 +136,7 @@ rendCoda cv = case cv of
             rendB = TightParens (rendCoda b)
             rendP = Symbol ps
             dirSep = Symbol "/"
-    Let{} -> uncurry RLet (getLetLis cv)
+    Let{} -> entity (uncurry RLet (getLetLis cv))
         where
             getLetLis :: CodaVal -> ([RendCoda], RendCoda)
             getLetLis (Let v1 val1 body1) =
@@ -133,6 +145,11 @@ rendCoda cv = case cv of
                 in
                     over _1 (enwAs:) (getLetLis body1)
             getLetLis other = ([], rendCoda other)
+    Convert val ct -> entity (CommaAnnot rendVal (RType ct))
+        where
+            rendVal = case val of
+                Let{} -> Parens1 (rendCoda val)
+                _ -> rendCoda val
 
 randomPrintCoda :: CodaVal -> Gen String
 randomPrintCoda = doRend . rendCoda

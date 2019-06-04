@@ -51,6 +51,13 @@ parseSpec = describe "CodaVal_parser" $ do
         parseSucc "let x = let y = 0x1 in y in x" (clet "x" [("x", clet "y" [("y", 1)])])
         parseSucc "(let x = 0x0002 in x/a/b, let x=0x01; y= \" x\" in (x, y)/x)"
             (r [clet (d "x" ["a", "b"]) [("x", (l "0002"))], clet (d (r ["x", "y"]) ["x"]) [("x", (l "01")), ("y", s " x")]])
+    it "type_annotation" $ do
+        let l2 = l "02"
+            l2xy = d l2 ["x", "y"]
+        parseSucc "0x02 : String" (cv l2 ts)
+        parseSucc "0x02 : {}" (cv l2 emptBd)
+        parseSucc "0x02/x/y : String" (cv l2xy ts)
+        parseSucc "0x02/x/y : { a: String, b :{}}" (cv l2xy (bd [("a", ts), ("b", emptBd)]))
     parserQuickCheck
 
 -- randomly generate codaval and randomly serilize to string, parser sould be able to parse it back

@@ -32,7 +32,7 @@ data ParseRes = PLit Text
     | PLet [(Text, ParseRes)] ParseRes
     | PCl (Cmd ParseRes)
     | PDir ParseRes [Text]
-    | PConv ParseRes CodaType
+    | PConv ParseRes [CodaType]
     deriving (Show, Read, Eq, Ord)
 
 fromParseRes :: ParseRes -> CodaVal
@@ -45,7 +45,9 @@ fromParseRes res = case res of
                           (over (traverse . _2) fromParseRes as)
     PCl (Run ps)   -> Cl (Run (fromParseRes <$> ps))
     PDir home subs -> foldl' Dir (fromParseRes home) subs
-    PConv val t -> Convert (fromParseRes val) t
+    PConv val ts -> case ts of
+        [] -> fromParseRes val
+        _ -> foldl' Convert (fromParseRes val) ts
 
 optionalFollowed :: (a -> b -> a) -> a -> Maybe b -> a
 optionalFollowed f a m = case m of
@@ -127,7 +129,7 @@ dirExpr = highlight LiterateSyntax (token dirWithType) <?> "codalang expression"
     makeDir :: (ParseRes, Maybe [Text]) -> ParseRes
     makeDir = uncurry (optionalFollowed PDir)
     dirParse = token (makeDir <$> followedByList normalExpr dirSep filename)
-    dirWithType = liftA2 (optionalFollowed PConv) dirParse typeAnnotation
+    dirWithType = liftA2 PConv dirParse (many typeAnnotation)
 
 normalExpr :: (TokenParsing m) => m ParseRes
 normalExpr =
@@ -135,10 +137,10 @@ normalExpr =
         <?> "regular codalang expression"
 
 
-typeAnnotation :: (TokenParsing m) => m (Maybe CodaType)
-typeAnnotation = (hasAnnot <|> pure Nothing) <?> "type annotation"
+typeAnnotation :: (TokenParsing m) => m CodaType
+typeAnnotation = hasAnnot <?> "type annotation"
     where
-        hasAnnot = Just <$> (symbol ":" *> typeExpr)
+        hasAnnot = symbol ":" *> typeExpr
         typeExpr :: (TokenParsing m) => m CodaType
         typeExpr = typeStr <|> typeBun <?> "type expression"
             where
