@@ -11,13 +11,14 @@ import Lang.Fold
 
 import RIO hiding (to)
 import qualified RIO.Text as T
+import qualified RIO.Map as M
 import RIO.List (zipWith, repeat)
 import Control.Monad.State
 import Control.Lens
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.Text (renderStrict)
 
-data Anno = DirAnno | Keyword | VarAnno Text Int | LitAnno | StrAnno | RunAnno | LetAnno | StmtAnno
+data Anno = DirAnno | Keyword | VarAnno Text Int | LitAnno | StrAnno | RunAnno | LetAnno | StmtAnno | TypeAnno
     deriving (Show, Read, Eq, Ord)
 
 data PPState = PPState {_counter :: Int, _env :: VarMap Int}
@@ -26,7 +27,7 @@ makeLenses ''PPState
 
 type AnnoDoc = Doc Anno
 
-data PPrint = Value AnnoDoc | PLet [AnnoDoc] AnnoDoc
+data PPrint = Value AnnoDoc | PLet [AnnoDoc] AnnoDoc | PTypeAnno AnnoDoc
     deriving (Show)
 
 type PPPass = StateT PPState Identity
@@ -46,6 +47,7 @@ ranno a d = return (anno a d)
 
 toAnnoDoc :: PPrint -> AnnoDoc
 toAnnoDoc (Value d) = d
+toAnnoDoc (PTypeAnno d) = d
 toAnnoDoc (PLet as body) = annotate LetAnno (hang 3 (sep [defs, body]))
     where
         keyword = annotate Keyword
@@ -56,8 +58,14 @@ toAnnoDoc (PLet as body) = annotate LetAnno (hang 3 (sep [defs, body]))
 
 toAnnoDocWithParen :: PPrint -> AnnoDoc
 toAnnoDocWithParen pval = case pval of
-    PLet{} -> parens (toAnnoDoc pval)
-    _ -> toAnnoDoc pval
+    Value{} -> toAnnoDoc pval
+    _ -> parens (toAnnoDoc pval)
+
+instance (Pretty CodaType) where
+    pretty TypeString = "String"
+    pretty (BundleDic dic) = group (encloseSep (flatAlt "{ " "{") (flatAlt " }" "}") ", " dicLis)
+        where
+            dicLis = [ sep [cat [pretty k, ":"], pretty v] | (k, v) <- M.toList dic]
 
 instance CodaLangEnv PPPass PPrint where
     lit u = ranno LitAnno (pretty (show u))
@@ -89,7 +97,9 @@ instance CodaLangEnv PPPass PPrint where
         bodydoc <- withVar vn c body
         return $ case bodydoc of
             Value d -> PLet [stmt] d
+            PTypeAnno d -> PLet [stmt] d
             PLet ss d -> PLet (stmt : ss) d
+    convert val ct = return (PTypeAnno (annotate TypeAnno (fillCat [toAnnoDocWithParen val, " : ", pretty ct])))
 
 codaToDoc :: CodaVal -> AnnoDoc
 codaToDoc cv = toAnnoDoc res
