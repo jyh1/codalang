@@ -73,7 +73,7 @@ randVarName =
 
 randLeaf :: CodaType -> GenEnv CodaVal
 randLeaf c = case c of
-  TypeBundle -> bundleLeaf
+  BundleDic{} -> bundleLeaf
   TypeString -> strLeaf
   where
     genLeaf :: CodaType -> [Gen CodaVal] -> GenEnv CodaVal
@@ -88,7 +88,7 @@ randLeaf c = case c of
         where
           randStr = T.pack <$> (resize 5 (listOf arbitraryASCIIChar))
     bundleLeaf :: GenEnv CodaVal
-    bundleLeaf = genLeaf TypeBundle [Lit <$> arbitrary]
+    bundleLeaf = genLeaf typeBundle [Lit <$> arbitrary]
 
 -- non-leaf node
 childDepth :: (Int -> Int) -> GenEnv a -> GenEnv a
@@ -105,7 +105,7 @@ decDepth = childDepth (\x -> x - 1)
 
 randDir :: GenEnv CodaVal
 randDir = do
-  bdl <- decDepth (randTree TypeBundle)
+  bdl <- decDepth (randTree typeBundle)
   path <- nonEmptyList 5 (lift randVarName)
   return (foldl Dir bdl path)
 
@@ -133,12 +133,12 @@ randTree t = do
   if n == 0 
     then randLeaf t 
     else case t of
-      TypeBundle -> randBundle
+      BundleDic{} -> randBundle
       TypeString -> randString
   where
     -- non leaf bundle type
     randBundle :: GenEnv CodaVal
-    randBundle = oneofGenEnv [randCl, randDir, randLet TypeBundle]
+    randBundle = oneofGenEnv [randCl, randDir, randLet typeBundle]
     -- non leaf string
     randString :: GenEnv CodaVal
     randString = randLet TypeString
@@ -151,7 +151,7 @@ randCodaVal = do
   return (t, val)
   where
     randType :: GenEnv CodaType
-    randType = lift (elements [TypeString, TypeBundle])
+    randType = lift (elements [TypeString, typeBundle])
 
 randoCodaValWithDep :: Int -> Gen (CodaType, CodaVal)
 randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 15 dep))

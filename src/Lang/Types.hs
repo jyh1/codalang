@@ -6,6 +6,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module Lang.Types where
 
@@ -47,11 +48,13 @@ data CodaVal = Lit UUID
 tmpName :: Text
 tmpName = "codalang"
 
-data CodaType = TypeString | TypeBundle
+data CodaType = TypeString | BundleDic (Map Text CodaType)
     deriving (Eq, Ord, Read)
+typeBundle :: CodaType
+typeBundle = BundleDic mempty
 instance Show CodaType where
     show TypeString = "String"
-    show TypeBundle = "{_}"
+    show BundleDic{} = "{_}"
 
 data CodaResult = ResStr Text | ResBundle UUID
     deriving (Eq, Ord, Read, Show)

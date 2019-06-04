@@ -45,7 +45,7 @@ throwErr :: TypeError -> TCPass a
 throwErr err = lift (Left err)
 
 instance CodaLangEnv TCPass TCRes where
-    lit u = return (TypeBundle, Lit u)
+    lit u = return (typeBundle, Lit u)
     var vn = do
         varType <- use (envL . at vn)
         maybe err getRes varType
@@ -56,11 +56,11 @@ instance CodaLangEnv TCPass TCRes where
     cl (Run es) = do
         es' <- sequence es
         let (_, elems) = unzip es'
-        return (TypeBundle, Cl (Run elems))
+        return (typeBundle, Cl (Run elems))
     dir val sub = case val of
         (TypeString, ast) ->
-            throwErr (TypeError (Mismatch TypeBundle TypeString) ast)
-        (TypeBundle, ast) -> return (TypeBundle, Dir ast sub)
+            throwErr (TypeError (Mismatch typeBundle TypeString) ast)
+        (BundleDic{}, ast) -> return (typeBundle, Dir ast sub)
     clet vn val body = do
         (valt , valast ) <- val
         (bodyT, bodyAst) <- withVar vn valt body
