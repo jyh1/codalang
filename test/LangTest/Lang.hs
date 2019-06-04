@@ -76,19 +76,22 @@ randLeaf c = case c of
   BundleDic{} -> bundleLeaf
   TypeString -> strLeaf
   where
-    genLeaf :: CodaType -> [Gen CodaVal] -> GenEnv CodaVal
-    genLeaf t others = do
+    genLeaf :: (CodaType -> Bool) -> [Gen CodaVal] -> GenEnv CodaVal
+    genLeaf f others = do
       gm <- use envL
-      let vs = [v | (v, t') <- M.toList gm, t' == t]
+      let vs = [v | (v, t') <- M.toList gm, f t']
       lift $ case vs of
         [] -> oneof others
         _ -> oneof ((Var <$> elements vs) : others)
     strLeaf :: GenEnv CodaVal
-    strLeaf = genLeaf TypeString [Str <$> randStr]
+    strLeaf = genLeaf ( == TypeString) [Str <$> randStr]
         where
           randStr = T.pack <$> (resize 5 (listOf arbitraryASCIIChar))
     bundleLeaf :: GenEnv CodaVal
-    bundleLeaf = genLeaf typeBundle [Lit <$> arbitrary]
+    bundleLeaf = genLeaf (isBundle) [Lit <$> arbitrary]
+    isBundle t = case t of
+      BundleDic{} -> True
+      _ -> False
 
 -- non-leaf node
 childDepth :: (Int -> Int) -> GenEnv a -> GenEnv a
@@ -138,12 +141,12 @@ randTree t = do
   if n == 0 
     then randLeaf t 
     else case t of
-      BundleDic{} -> randBundle
+      BundleDic{} -> randBundle t
       TypeString -> randString
   where
     -- non leaf bundle type
-    randBundle :: GenEnv CodaVal
-    randBundle = oneofGenEnv [randCl, randDir, randLet typeBundle, randConvert typeBundle]
+    randBundle :: CodaType -> GenEnv CodaVal
+    randBundle t = oneofGenEnv [randCl, randDir, randLet t, randConvert t]
     -- non leaf string
     randString :: GenEnv CodaVal
     randString = oneofGenEnv [randLet TypeString, randConvert TypeString]
@@ -151,12 +154,14 @@ randTree t = do
 
 randCodaVal :: GenEnv (CodaType, CodaVal)
 randCodaVal = do
-  t <- randType
+  t <- lift randType
   val <- randTree t
   return (t, val)
   where
-    randType :: GenEnv CodaType
-    randType = lift (elements [TypeString, typeBundle])
+    randType :: Gen CodaType
+    randType = oneof [pure TypeString, BundleDic <$> randDic]
+    randDicEle = liftA2 (curry id) randVarName randType
+    randDic = M.fromList <$> (resize 3 (listOf randDicEle))
 
 randoCodaValWithDep :: Int -> Gen (CodaType, CodaVal)
 randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 15 dep))
