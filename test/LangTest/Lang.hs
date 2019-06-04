@@ -106,7 +106,7 @@ decDepth = childDepth (\x -> x - 1)
 randDir :: GenEnv CodaVal
 randDir = do
   bdl <- decDepth (randTree typeBundle)
-  path <- nonEmptyList 5 (lift randVarName)
+  path <- lift (resize 5 (listOf randVarName))
   return (foldl Dir bdl path)
 
 randCl :: GenEnv CodaVal
@@ -159,7 +159,7 @@ randCodaVal = do
     randType = lift (elements [TypeString, typeBundle])
 
 randoCodaValWithDep :: Int -> Gen (CodaType, CodaVal)
-randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 5 dep))
+randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 15 dep))
 
 data RandCoda = RandCoda CodaType CodaVal
     deriving (Show, Read, Eq)
