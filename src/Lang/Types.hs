@@ -51,12 +51,9 @@ tmpName :: Text
 tmpName = "codalang"
 
 data CodaType = TypeString | BundleDic (Map Text CodaType)
-    deriving (Eq, Ord, Read)
+    deriving (Eq, Ord, Read, Show)
 typeBundle :: CodaType
 typeBundle = BundleDic mempty
-instance Show CodaType where
-    show TypeString = "String"
-    show BundleDic{} = "{_}"
 
 data CodaResult = ResStr Text | ResBundle UUID
     deriving (Eq, Ord, Read, Show)

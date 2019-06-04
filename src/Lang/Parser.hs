@@ -144,7 +144,7 @@ typeAnnotation = (hasAnnot <|> pure Nothing) <?> "type annotation"
             where
                 typeStr = makeKeyword "String" $> TypeString
                 typeKey = T.pack <$> (some fileNameChar) <?> "type dictionary key"
-                typeBun = BundleDic . M.fromList <$> parseDicSyntax typeKey typeExpr
+                typeBun = BundleDic . M.fromList <$> parseDicSyntax (token typeKey) (token typeExpr)
 
 codaExpr :: (TokenParsing m) => m ParseRes
 codaExpr = dirExpr
