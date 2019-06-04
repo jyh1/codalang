@@ -14,6 +14,7 @@ import           Lang.Types
 
 import           RIO                     hiding ( try )
 import qualified RIO.Text                      as T
+import qualified RIO.Map                       as M
 -- import           Text.Parser.Combinators        ( (<?>) )
 import           Text.Parser.Combinators
 -- import Text.Parser.Expression
@@ -24,7 +25,6 @@ import           Text.Parser.Char               ( char )
 import           Text.Parser.Token.Highlight
 import           Text.Trifecta
 import           Control.Lens                   ( _2 )
-import           Data.Char                      (isSpace)
 
 data ParseRes = PLit Text
     | PVar Text
@@ -32,6 +32,7 @@ data ParseRes = PLit Text
     | PLet [(Text, ParseRes)] ParseRes
     | PCl (Cmd ParseRes)
     | PDir ParseRes [Text]
+    | PConv ParseRes CodaType
     deriving (Show, Read, Eq, Ord)
 
 fromParseRes :: ParseRes -> CodaVal
@@ -44,7 +45,21 @@ fromParseRes res = case res of
                           (over (traverse . _2) fromParseRes as)
     PCl (Run ps)   -> Cl (Run (fromParseRes <$> ps))
     PDir home subs -> foldl' Dir (fromParseRes home) subs
+    PConv val t -> Convert (fromParseRes val) t
 
+optionalFollowed :: (a -> b -> a) -> a -> Maybe b -> a
+optionalFollowed f a m = case m of
+    Nothing -> a
+    Just b -> f a b
+
+fileNameChar :: (TokenParsing m) => m Char
+fileNameChar = noneOf "/\\?%*:|\"><';(),{}[]\r\n\t "
+
+parseDicSyntax :: (TokenParsing m) => m a -> m b -> m [(a, b)]
+parseDicSyntax key val = braces eles
+    where
+        ele = liftA2 (curry id) (key <* token (symbol ":")) val
+        eles = sepBy ele (symbol ",")
 
 bundleLit :: (TokenParsing m) => m ParseRes
 bundleLit = highlight Constant uuidlit
@@ -82,11 +97,11 @@ letExpr = highlight Constructor (token (expr <?> "let_exprssions"))
 
 -- | used to build dir expression and paren expression
 followedByList
-    :: (TokenParsing m, Show b) => m a -> m b -> m c -> m (a, Maybe [c])
+    :: (TokenParsing m) => m a -> m b -> m c -> m (a, Maybe [c])
 followedByList p sep after = token $ do
     e1   <- p
     rest <-
-        (notFollowedBy sep $> Nothing) <|> (Just <$> (sep *> sepBy after sep))
+        (Just <$> (sep *> sepBy after sep)) <|> pure Nothing
     return (e1, rest)
 
 -- | A run bundle or (expr)
@@ -105,19 +120,31 @@ stringExpr = PStr <$> stringLiteral
 
 -- | e/sub1/sub2/file1
 dirExpr :: (TokenParsing m) => m ParseRes
-dirExpr = highlight LiterateSyntax (token dirParse) <?> "codalang expression"
+dirExpr = highlight LiterateSyntax (token dirWithType) <?> "codalang expression"
   where
-    filename = T.pack <$> many (noneOf "/\\?%*:|\"><';(),{}[]\r\n\t ")
+    filename = T.pack <$> many fileNameChar <?> "file name"
     dirSep   = highlight ReservedOperator (char '/' <?> "path seperator")
     makeDir :: (ParseRes, Maybe [Text]) -> ParseRes
-    makeDir (e1, Nothing) = e1
-    makeDir (e1, Just es) = PDir e1 es
-    dirParse = makeDir <$> followedByList normalExpr dirSep filename
+    makeDir = uncurry (optionalFollowed PDir)
+    dirParse = token (makeDir <$> followedByList normalExpr dirSep filename)
+    dirWithType = liftA2 (optionalFollowed PConv) dirParse typeAnnotation
 
 normalExpr :: (TokenParsing m) => m ParseRes
 normalExpr =
     (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr)
         <?> "regular codalang expression"
+
+
+typeAnnotation :: (TokenParsing m) => m (Maybe CodaType)
+typeAnnotation = (hasAnnot <|> pure Nothing) <?> "type annotation"
+    where
+        hasAnnot = Just <$> (symbol ":" *> typeExpr)
+        typeExpr :: (TokenParsing m) => m CodaType
+        typeExpr = typeStr <|> typeBun <?> "type expression"
+            where
+                typeStr = makeKeyword "String" $> TypeString
+                typeKey = T.pack <$> (some fileNameChar) <?> "type dictionary key"
+                typeBun = BundleDic . M.fromList <$> parseDicSyntax typeKey typeExpr
 
 codaExpr :: (TokenParsing m) => m ParseRes
 codaExpr = dirExpr
