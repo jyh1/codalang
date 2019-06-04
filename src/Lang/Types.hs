@@ -16,11 +16,12 @@ import           Control.Lens                   ( makeLenses
                                                 )
 
 -- UUID of CodaLab bundle
-newtype UUID = UUID {unuuid :: Text}
+data UUID = UUID Text | BundleName Text
     deriving (Eq, Ord, Read)
 
 instance Show UUID where
     show (UUID n) = "0x" ++ T.unpack n
+    show (BundleName t) = T.unpack t
 
 type VarName = Text
 
@@ -43,6 +44,7 @@ data CodaVal = Lit UUID
     | Str Text
     | Dir CodaVal Text
     | Let VarName CodaVal CodaVal
+    | Convert CodaVal CodaType
     deriving (Eq, Ord, Read, Show)
 
 tmpName :: Text
