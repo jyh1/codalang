@@ -8,20 +8,22 @@ module Lang.Interpret(evalCoda) where
 
 import           RIO
 import qualified RIO.Text                      as T
+import           RIO.Partial                    ( fromJust )
 import           RIO.List                       ( unzip )
 import qualified RIO.Map                       as M
 import           Control.Monad.State
 import           Control.Lens
+import           Data.Tuple                     ( swap )
 
 import           Lang.Types
 
 type RunEnv a = Map Text (RuntimeRes a)
 type RunCoda m a = StateT (RunEnv a) m (RuntimeRes a)
 
-evalCoda :: (Exec m a) => CodaVal -> m (RuntimeRes a)
+evalCoda :: (Exec m a, Ord a) => CodaVal -> m (RuntimeRes a)
 evalCoda cv = evalStateT (runCoda cv) mempty
 
-runCoda :: (Exec m a) => CodaVal -> RunCoda m a
+runCoda :: (Exec m a, Ord a) => CodaVal -> RunCoda m a
 runCoda cv = case cv of
     Var v -> lookupVar v
     Dir{} -> do
@@ -35,12 +37,12 @@ runCoda cv = case cv of
         runCoda body
     _ -> error "Impossible happened: not an RCO expr"
 
-prepLetRhs :: (Exec m a) => Text -> CodaVal -> RunCoda m a
+prepLetRhs :: (Exec m a, Ord a) => Text -> CodaVal -> RunCoda m a
 prepLetRhs vn cv = case cv of
     Cl (Run cmd) -> do
         prepCmd <- mapM prepCmdEle cmd
-        let (txtCmd, deps) = unzip prepCmd
-            depRep         = M.fromList (concat deps)
+        let (depCmd, deps) = unzip prepCmd
+            (txtCmd, depRep) = rmDupDep depCmd (concat deps)
         lift (emptyBundle <$> clRun vn depRep txtCmd)
       where
         prepCmdEle ele = case ele of
@@ -49,12 +51,20 @@ prepLetRhs vn cv = case cv of
                 vres <- lookupVar v
                 return $ case vres of
                     RuntimeString s    -> (Plain s, [])
-                    RuntimeBundle b ps -> (BundleRef v [], [(v, Deps b ps)])
+                    RuntimeBundle b ps -> (BundleRef depInfo [], [(v, depInfo)])
+                        where depInfo = Deps b ps
             Dir{} -> do
                 (v, vpath) <- dirRootLookup dirRoot
-                return (BundleRef dirRoot path, [(dirRoot, Deps v vpath)])
+                let depInfo = Deps v vpath
+                return (BundleRef depInfo path, [(dirRoot, depInfo)])
                 where (dirRoot, path) = getPath [] ele
             _ -> error "Impossible happened: arguments in run"
+        rmDupDep txtCmd deps = ((fmap depToVar) <$> txtCmd, varVal)
+            where
+                valVar = M.fromList (swap <$> deps)
+                depToVar dep = fromJust (M.lookup dep valVar)
+                varVal = M.fromList (swap <$> M.toList valVar)
+
     Dir{} -> runCoda cv
     Str{} -> runCoda cv
     Lit u -> lift (emptyBundle <$> clLit vn u)

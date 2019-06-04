@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Lang.Types where
 
@@ -65,14 +66,14 @@ buildPath :: [Text] -> Text
 buildPath = T.intercalate "/"
 
 data Deps a = Deps a [Text]
-    deriving (Show, Read, Eq)
+    deriving (Show, Read, Eq, Ord)
 
-data CMDEle = Plain Text | BundleRef Text [Text]
-    deriving (Show, Read, Eq)
+data CMDEle a = Plain Text | BundleRef a [Text]
+    deriving (Show, Read, Eq, Functor, Ord)
 
 class (Monad m) => Exec m a where
-    clRun :: Text -> Map Text (Deps a) -> [CMDEle] -> m a
+    clRun :: Text -> Map Text (Deps a) -> [CMDEle Text] -> m a
     clLit :: Text -> UUID -> m a
 
 data RuntimeRes a = RuntimeString Text | RuntimeBundle a [Text]
-    deriving (Show, Read, Eq)
+    deriving (Show, Read, Eq, Ord)
