@@ -48,12 +48,13 @@ instance CodaLangEnv InterApp CodaTestRes where
     var v = use (envL . at v . to (fromMaybe errmsg))
         where
             errmsg = error ("Undefined var in test interpreter: " ++ T.unpack v)
-    cl (Run cmd) = do
-        -- logging run command
-        cmd' <- sequence cmd
-        cmdlog %= (LogRun cmd' :)
-        runid <- getCounter
-        return (RunRes runid)
+    cl clcmd = do
+        cmd <- sequenceA clcmd
+        case cmd of
+            Run cmd' -> do
+                cmdlog %= (LogRun cmd' :)
+                RunRes <$> getCounter
+            ClCat val -> runCat val
     dir val sub = return $ case val of
         DirRes v subs -> DirRes v (subs ++ [sub])
         other -> DirRes other [sub]
@@ -68,10 +69,12 @@ instance CodaLangEnv InterApp CodaTestRes where
         TypeString -> case val of
             StrRes{} -> return val
             CatRes{} -> return val
-            _ -> do
-                cmdlog %= (LogCat val :)
-                catid <- getCounter
-                return (CatRes catid)
+            _ -> runCat val
+
+runCat :: CodaTestRes -> InterApp CodaTestRes
+runCat val = do
+    cmdlog %= (LogCat val :)
+    CatRes <$> getCounter
 
 -- return logs of runned command and final result
 testInterpret :: CodaVal -> ([CmdLog CodaTestRes], CodaTestRes)
