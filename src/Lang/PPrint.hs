@@ -88,6 +88,7 @@ instance CodaLangEnv PPPass PPrint where
                 [e] -> lpr <> e <> comma <> rpr
                 _ -> cat (zipWith (<>) (lpr : repeat s) cs') <> rpr
         ranno RunAnno (group runeles)
+    cl (ClCat val) = val >>= (`convert` TypeString)
     dir bval sub = 
         ranno DirAnno (toAnnoDocWithParen bval <> "/" <> pretty sub)
     clet vn val body = do
