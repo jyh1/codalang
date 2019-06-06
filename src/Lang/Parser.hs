@@ -30,7 +30,7 @@ data ParseRes = PLit Text
     | PVar Text
     | PStr Text
     | PLet [(Text, ParseRes)] ParseRes
-    | PCl (Cmd ParseRes)
+    | PRun [ParseRes]
     | PDir ParseRes [Text]
     | PConv ParseRes [CodaType]
     deriving (Show, Read, Eq, Ord)
@@ -43,7 +43,7 @@ fromParseRes res = case res of
     PLet as body -> foldr (uncurry Let)
                           (fromParseRes body)
                           (over (traverse . _2) fromParseRes as)
-    PCl (Run ps)   -> Cl (Run (fromParseRes <$> ps))
+    PRun ps   -> Cl (Run (fromParseRes <$> ps))
     PDir home subs -> foldl' Dir (fromParseRes home) subs
     PConv val ts -> case ts of
         [] -> fromParseRes val
@@ -115,7 +115,7 @@ parenExpr = highlight Special (token (parens inside)) <?> "paren expression"
     inside = uncurry makeRun <$> followedByList codaExpr comma codaExpr
     makeRun :: ParseRes -> Maybe [ParseRes] -> ParseRes
     makeRun e1 Nothing   = e1
-    makeRun e1 (Just es) = PCl (Run (e1 : es))
+    makeRun e1 (Just es) = PRun (e1 : es)
 
 stringExpr :: (TokenParsing m) => m ParseRes
 stringExpr = PStr <$> stringLiteral
