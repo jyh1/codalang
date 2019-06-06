@@ -60,7 +60,7 @@ foldCoda (Lit u  ) = lit u
 foldCoda (Var v  ) = var v
 foldCoda (Str s) = str s
 foldCoda (Cl  cmd) = do
-    let cmdval = over (runcmd . mapped) foldCoda cmd
+    let cmdval = over mapped foldCoda cmd
     cl cmdval
 foldCoda (Dir bndl sub) = do
     root <- foldCoda bndl

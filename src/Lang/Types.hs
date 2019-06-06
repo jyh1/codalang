@@ -27,10 +27,14 @@ type VarName = Text
 
 -- Codalab command
 
-newtype Cmd a = Run {_runcmd :: [a]}
+data Cmd a = Run [a] | ClCat a
     deriving (Eq, Ord, Read, Show, Functor)
-
-makeLenses ''Cmd
+instance Foldable Cmd where
+    foldMap f (ClCat a) = f a
+    foldMap f (Run as) = foldMap f as
+instance Traversable Cmd where
+    traverse f (ClCat a) = ClCat <$> (f a)
+    traverse f (Run as) = Run <$> (traverse f as)
 
 type CodaCmd = Cmd CodaVal
 
