@@ -280,4 +280,4 @@ testPPrintCompact :: CodaVal -> String
 testPPrintCompact cv = T.unpack (renderStrict (layoutCompact (codaToDoc cv)))
 
 testTypeCheck :: CodaVal -> Either Text CodaType
-testTypeCheck = typeCheck
+testTypeCheck = (fmap fst) <$> typeCheck

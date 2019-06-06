@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Lang.TypeCheck(typeCheck) where
 
@@ -37,40 +38,57 @@ instance Show TypeError where
 
 type TCState = Map VarName CodaType
 type TCPass = StateT TCState (Either TypeError)
-type TCRes = (CodaType, CodaVal)
+data TCRes a = TCRes {resType :: CodaType, resVal :: a, resOrig :: a}
+    deriving (Show, Read, Eq, Functor)
+fmapT :: CodaType -> (a -> b) -> TCRes a -> TCRes b
+fmapT t f res = (fmap f res){resType = t}
+liftRes2 :: (a -> b -> c) -> TCRes a -> TCRes b -> TCRes c
+liftRes2 f (TCRes _ v1 o1) (TCRes t2 v2 o2) = TCRes t2 (f v1 v2) (f o1 o2)
+coSequenceT :: CodaType -> [TCRes a] -> TCRes [a]
+coSequenceT t as = TCRes {resType = t, resVal = resVal <$> as, resOrig = resOrig <$> as}
+
+makeRes :: CodaType -> CodaVal -> (TCRes CodaVal)
+makeRes t v = TCRes t v v
 
 instance LocalVar TCState TCPass CodaType
 
 throwErr :: TypeError -> TCPass a
 throwErr err = lift (Left err)
 
-instance CodaLangEnv TCPass TCRes where
-    lit u = return (typeBundle, Lit u)
+instance CodaLangEnv TCPass (TCRes CodaVal) where
+    lit u = return (makeRes typeBundle (Lit u))
     var vn = do
         varType <- use (envL . at vn)
         maybe err getRes varType
       where
         err = throwErr (TypeError UnDef (Var vn))
-        getRes t = return (t, Var vn)
-    str k = return (TypeString, Str k)
+        getRes t = return (makeRes t (Var vn))
+    str k = return (makeRes TypeString (Str k))
     cl (Run es) = do
         es' <- sequence es
-        let (_, elems) = unzip es'
-        return (typeBundle, Cl (Run elems))
-    dir val sub = case val of
-        (TypeString, ast) ->
-            throwErr (TypeError (Mismatch typeBundle TypeString) ast)
-        (BundleDic{}, ast) -> return (typeBundle, Dir ast sub)
+        return (makeRun <$> (coSequenceT typeBundle es'))
+        where
+            makeRun = Cl . Run
+    dir val sub = case resType val of
+        TypeString -> throwErr (TypeError (Mismatch typeBundle TypeString) ast)
+        BundleDic{} -> return (fmapT typeBundle (`Dir` sub) val)
+        where
+            ast = resOrig val
     clet vn val body = do
-        (valt , valast ) <- val
-        (bodyT, bodyAst) <- withVar vn valt body
-        return (bodyT, Let vn valast bodyAst)
-    convert val vt = return (vt, Convert (snd val) vt)
+        valRes <- val
+        bodyRes <- withVar vn (resType valRes) body
+        return (liftRes2 (Let vn) valRes bodyRes)
+    convert val vt
+        | normType (resType val) == normType vt = return val
+        | otherwise = return (fmapT vt (`Convert` vt) val)
+        where
+            normType BundleDic{} = typeBundle
+            normType t = t
 
-typeCheck :: CodaVal -> Either Text CodaType
+typeCheck :: CodaVal -> Either Text (CodaType, CodaVal)
 typeCheck cv = case res of
-    Right (ty, _) -> Right ty
+    Right val -> Right (resType val, resVal val)
     Left  err     -> Left (tshow err)
   where
-    app = foldCoda cv :: TCPass TCRes
+    app = foldCoda cv :: TCPass (TCRes CodaVal)
     res = evalStateT app mempty
