@@ -214,6 +214,10 @@ cv = Convert
 ts = TypeString
 emptBd = BundleDic mempty
 
+normType :: CodaType -> CodaType
+normType BundleDic{} = BundleDic mempty
+normType t = t
+
 testRCO :: CodaVal -> CodaVal
 testRCO = runRCO
 

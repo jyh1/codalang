@@ -79,7 +79,7 @@ pprintSpec = describe "pretty-printer test" $ do
 typeCheckSpec :: Spec
 typeCheckSpec = describe "type-checker test" $ do
     it "pass type check in random generated ast" $ property $
-        (\(RandCoda ct cv) -> testTypeCheck cv `shouldBe` Right ct) 
+        (\(RandCoda ct cv) -> (normType <$> testTypeCheck cv) `shouldBe` Right (normType ct)) 
 
 rcoSpec :: Spec
 rcoSpec = describe "RCO(remove_complex_operation)" $ do

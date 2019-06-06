@@ -65,6 +65,7 @@ instance CodaLangEnv TCPass TCRes where
         (valt , valast ) <- val
         (bodyT, bodyAst) <- withVar vn valt body
         return (bodyT, Let vn valast bodyAst)
+    convert val vt = return (vt, Convert (snd val) vt)
 
 typeCheck :: CodaVal -> Either Text CodaType
 typeCheck cv = case res of
