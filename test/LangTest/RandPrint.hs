@@ -132,6 +132,7 @@ rendCoda cv = case cv of
             rendRs = rendCoda <$> rs
             rendLis = insertComma sep rendRs
             sep = spaceSymbol ","
+    Cl (ClCat val) -> rendCoda (Convert val TypeString)
     Str s -> entity (RStr s)
     Dir b ps -> entity (RLis [rendB, dirSep, rendP])
         where
