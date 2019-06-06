@@ -26,7 +26,7 @@ data RendCoda = Parens RendCoda
     | Symbol Text
     | RLit UUID
     | RLet [RendCoda] RendCoda
-    | CommaAnnot RendCoda RendCoda
+    | ColonAnnot Text RendCoda RendCoda
     | RType CodaType
     deriving (Show, Read, Eq, Ord)
 
@@ -41,6 +41,8 @@ entity = Parens . Spaces
 entSym :: Text -> RendCoda
 entSym = entity . Symbol
 
+singleColon = ColonAnnot ":"
+doubleColon = ColonAnnot "::"
 
 doRend :: RendCoda -> Gen String
 doRend rc = case rc of
@@ -64,12 +66,12 @@ doRend rc = case rc of
             (picked, rest) <- splitLists as
             newAs <- insertSemi (spaceSymbol ";") picked
             doRend (RLis (concat [[space1Symbol "let"], newAs, [space1Symbol "in", RLet rest body]]))
-    CommaAnnot val anot -> doRend (RLis [val, spaceSymbol ":", anot])
+    ColonAnnot t val anot -> doRend (RLis [val, spaceSymbol t, anot])
     RType ct -> case ct of
         TypeString -> doRend (spaceSymbol "String")
         BundleDic dic -> doRend (enloseParen "{" "}" (RLis annotComma))
             where
-                annotLis = [CommaAnnot (spaceSymbol k) (RType v) | (k, v) <- M.toList dic]
+                annotLis = [singleColon (spaceSymbol k) (RType v) | (k, v) <- M.toList dic]
                 annotComma = intersperse (spaceSymbol ",") annotLis
     where
         nTimes :: Int -> (a -> a) -> (a -> a)
@@ -84,7 +86,7 @@ doRend rc = case rc of
             [] -> RLis []
             _ -> RLis (over _last rmSpace as)
         rmSpace ras@RLet{} = TightParens1 ras
-        rmSpace ras@CommaAnnot{} = TightParens1 ras
+        rmSpace ras@ColonAnnot{} = TightParens1 ras
         rmSpace rest = rest
         enloseParen ll lr cont = RLis [spaceSymbol ll, cont, spaceSymbol lr]
 
@@ -145,7 +147,7 @@ rendCoda cv = case cv of
                 in
                     over _1 (enwAs:) (getLetLis body1)
             getLetLis other = ([], rendCoda other)
-    Convert val ct -> entity (CommaAnnot rendVal (RType ct))
+    Convert val ct -> entity (doubleColon rendVal (RType ct))
         where
             rendVal = case val of
                 Let{} -> Parens1 (rendCoda val)

@@ -54,10 +54,10 @@ parseSpec = describe "CodaVal_parser" $ do
     it "type_annotation" $ do
         let l2 = l "02"
             l2xy = d l2 ["x", "y"]
-        parseSucc "0x02 : String" (cv l2 ts)
-        parseSucc "0x02 : {}" (cv l2 emptBd)
-        parseSucc "0x02/x/y : String" (cv l2xy ts)
-        parseSucc "0x02/x/y : { a: String, b :{}}" (cv l2xy (bd [("a", ts), ("b", emptBd)]))
+        parseSucc "0x02 :: String" (cv l2 ts)
+        parseSucc "0x02 :: {}" (cv l2 emptBd)
+        parseSucc "0x02/x/y :: String" (cv l2xy ts)
+        parseSucc "0x02/x/y :: { a: String, b :{}}" (cv l2xy (bd [("a", ts), ("b", emptBd)]))
     parserQuickCheck
 
 -- randomly generate codaval and randomly serilize to string, parser sould be able to parse it back

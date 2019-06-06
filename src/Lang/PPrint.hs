@@ -99,7 +99,7 @@ instance CodaLangEnv PPPass PPrint where
             Value d -> PLet [stmt] d
             PTypeAnno d -> PLet [stmt] d
             PLet ss d -> PLet (stmt : ss) d
-    convert val ct = return (PTypeAnno (annotate TypeAnno (fillCat [toAnnoDocWithParen val, " : ", pretty ct])))
+    convert val ct = return (PTypeAnno (annotate TypeAnno (fillCat [toAnnoDocWithParen val, " :: ", pretty ct])))
 
 codaToDoc :: CodaVal -> AnnoDoc
 codaToDoc cv = toAnnoDoc res

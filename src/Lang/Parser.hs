@@ -140,7 +140,7 @@ normalExpr =
 typeAnnotation :: (TokenParsing m) => m CodaType
 typeAnnotation = hasAnnot <?> "type annotation"
     where
-        hasAnnot = symbol ":" *> typeExpr
+        hasAnnot = symbol "::" *> typeExpr
         typeExpr :: (TokenParsing m) => m CodaType
         typeExpr = typeStr <|> typeBun <?> "type expression"
             where
