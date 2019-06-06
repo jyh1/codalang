@@ -21,10 +21,10 @@ import Lang.Types
 import Lang.Fold
 import Lang.Interpret
 
-data CodaTestRes = BunRes UUID | RunRes Int | DirRes CodaTestRes [Text] | StrRes Text | VarRes Text
+data CodaTestRes = BunRes UUID | RunRes Int | DirRes CodaTestRes [Text] | StrRes Text | VarRes Text | CatRes Int
     deriving (Show, Read, Eq, Ord)
 
-data CmdLog a = LogRun [a]
+data CmdLog a = LogRun [a] | LogCat a
     deriving (Show, Read, Eq, Ord)
 
 data CodaInterEnv a = CodaInterEnv {_envmap :: VarMap a, _cmdlog :: [CmdLog a], _counter :: Int}
@@ -60,6 +60,18 @@ instance CodaLangEnv InterApp CodaTestRes where
     clet varn val body = do
         valres <- val
         withVar varn valres body
+    convert val vt = case vt of
+        BundleDic{} -> case val of
+            StrRes s -> return (BunRes (BundleName s))
+            CatRes i -> return (RunRes i)
+            _ -> return val
+        TypeString -> case val of
+            StrRes{} -> return val
+            CatRes{} -> return val
+            _ -> do
+                cmdlog %= (LogCat val :)
+                catid <- getCounter
+                return (CatRes catid)
 
 -- return logs of runned command and final result
 testInterpret :: CodaVal -> ([CmdLog CodaTestRes], CodaTestRes)
