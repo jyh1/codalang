@@ -15,7 +15,7 @@ where
     -- value := bundle | str
     -- cmdRCO := Cmd value
     -- dirRCO := Dir bundle text
-    -- convert := Convert (lit | var | bundle) type
+    -- convert := Convert (var) BundleDic
     -- letRCO := Let var (cmdRCO | dirRCO | lit | str | convert) rco
     -- rco := value | letRCO
 

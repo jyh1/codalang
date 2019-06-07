@@ -182,6 +182,15 @@ instance Arbitrary ParserTest where
     randStr <- randomPrintCoda randCv
     return (ParserTest randCv randStr)
 
+-- arbitrary RandCoda after type check
+newtype RandCodaTypeCheck = RandCodaTypeCheck CodaVal
+    deriving (Show, Read, Eq)
+instance Arbitrary RandCodaTypeCheck where
+  arbitrary = do
+    (RandCoda _ cv) <- arbitrary
+    case testTypeCheckVal cv of
+      Right v -> return (RandCodaTypeCheck v)
+      _ -> error "rand gen error"
 -- short functions for writing expression
 
 instance IsString CodaVal where
@@ -241,6 +250,7 @@ isValue x = msum [isBundle x, isStr x, showError "isValue" x]
 
 isCMD :: RCOCheck
 isCMD (Cl (Run as)) = sequence_ (isValue <$> as)
+isCMD (Cl (ClCat v)) = msum [isLit v, isValue v]
 isCMD v = showError "isCMD" v
 
 isDir :: RCOCheck
@@ -251,8 +261,14 @@ isLit :: RCOCheck
 isLit (Lit _) = return ()
 isLit v = showError "isLit" v
 
+isConvert :: RCOCheck
+isConvert c@(Convert v t) = case (v, t) of
+  (Var{}, BundleDic{}) -> return ()
+  _ -> showError "isConvert" c
+isConvert c = showError "isConvert" c
+
 isLet :: RCOCheck
-isLet (Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr]), isRCO body]
+isLet (Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert]), isRCO body]
 isLet v = showError "isLet" v
 
 isRCO :: RCOCheck
