@@ -9,6 +9,7 @@ module Types where
 
 import           RIO                     hiding ( view )
 import qualified RIO.Text as T
+import qualified RIO.Text.Partial as T
 import           RIO.Process
 import qualified RIO.Map                       as M
 import           Control.Lens
@@ -65,7 +66,7 @@ instance Exec (RIO App) Text where
     appLog (Assign [EntVerbatim vn, EntParen (EntUUID resid)] (EntVerbatim <$> cmdTxt))
     return resid
    where
-    cmdTxt = fromEle <$> cmd
+    cmdTxt = map fromEle cmd
     fromDep (Deps u subs) = buildPath (u : subs)
     depTxt  = M.toList (fromDep <$> depMap)
     execCmd = ExecRun depTxt cmdTxt [ClName vn]
@@ -79,10 +80,10 @@ instance Exec (RIO App) Text where
       execCmd = ExecCat (fromDeps val)
 
 fromDeps :: Deps Text -> Text
-fromDeps (Deps r ps) = fromEle (BundleRef r ps)
+fromDeps (Deps r ps) = buildPath (r : ps)
 
 fromEle :: CMDEle Text -> Text
 fromEle e = case e of
-    Plain t        -> t
-    BundleRef r ps -> buildPath (r : ps)
+    Plain t        -> T.replace "\n" " " t
+    BundleRef r ps -> fromDeps (Deps r ps)
       
