@@ -259,7 +259,7 @@ isValue x = msum [isBundle x, isStr x, showError "isValue" x]
 
 isCMD :: RCOCheck
 isCMD (Cl (Run as)) = sequence_ (isValue <$> as)
-isCMD (Cl (ClCat v)) = msum [isLit v, isValue v]
+isCMD (Cl (ClCat v)) = msum [isValue v]
 isCMD v = showError "isCMD" v
 
 isDir :: RCOCheck

@@ -79,6 +79,7 @@ data CMDEle a = Plain Text | BundleRef a [Text]
 
 class (Monad m) => Exec m a where
     clRun :: Text -> Map Text (Deps a) -> [CMDEle Text] -> m a
+    clCat :: Text -> Deps a -> m Text
     clLit :: Text -> UUID -> m a
 
 data RuntimeRes a = RuntimeString Text | RuntimeBundle a [Text]

@@ -124,9 +124,9 @@ toValue (RCOStr t) = return (Str t)
 toValue rest = Var <$> toVarName rest
 
 -- (lit | dir | var)
-toLitValue :: RCOVal -> RCOPass Value
-toLitValue (RCOLit u) = return (Lit u)
-toLitValue val = toValue val
+-- toLitValue :: RCOVal -> RCOPass Value
+-- toLitValue (RCOLit u) = return (Lit u)
+-- toLitValue val = toValue val
 
 toSubDir :: RCOVal -> RCOPass (VarName, Path)
 toSubDir (RCODir bname subdirs) = return (bname, subdirs)
@@ -154,7 +154,7 @@ instance CodaLangEnv RCOPass RCORes where
         newns <- withLocal vname (val >>= toVarName)
         withVar vname newns body
     convert val t = do
-        cval <- toLitValue val
+        cval <- toValue val
         let conv = RCOVar <$> bindName (Convert cval t)
             catCmd = return (RCOCmd (ClCat cval))
         case (cval, t) of
