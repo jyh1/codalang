@@ -9,19 +9,24 @@ import qualified System.Process.Typed as P
 
 import Lang.Lang
 
-cmdExec :: Execute -> IO UUID
-cmdExec (ExecRun env cmd opts) = do
-    (res, _) <- P.readProcess_ process
-    let resstr = toStrictBytes res
-    case byteToUUID resstr of
-        Just uuid -> return uuid
-        Nothing -> throwString "No valid UUID returned!"
+cmdExec :: Execute -> IO ByteString
+cmdExec exec = case exec of
+    ExecRun env cmd opts ->
+        runProcess process
+        -- case byteToUUID resstr of
+        --     Just uuid -> return uuid
+        --     Nothing -> throwString "No valid UUID returned!"
+        where
+            (subcmd, cmdstr) = buildRunCmd cmd
+            envstr = buildEnv env
+            optArgs = makeOptArgs opts
+            process = P.proc "cl" (concat [[subcmd], optArgs, envstr, [cmdstr]])
+    ExecCat v -> runProcess (makeProc ["cat", T.unpack v])
     where
-        (subcmd, cmdstr) = buildRunCmd cmd
-        envstr = buildEnv env
-        process = P.proc "cl" (concat [[subcmd], optArgs, envstr, [cmdstr]])
-        optArgs = makeOptArgs opts
-
+        runProcess pro = do
+            (res, _) <- P.readProcess_ pro
+            return (toStrictBytes res)
+        makeProc = P.proc "cl"
 
 buildRunCmd :: [Text] -> (String, String)
 buildRunCmd es = ("run", T.unpack (T.intercalate " " es))

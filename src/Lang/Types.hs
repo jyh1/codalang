@@ -66,6 +66,7 @@ data ClOption = ClName Text
     deriving (Show, Read, Eq)
 
 data Execute = ExecRun [(Text, Text)] [Text] [ClOption]
+    | ExecCat Text
     deriving (Show, Read, Eq)
 
 buildPath :: [Text] -> Text

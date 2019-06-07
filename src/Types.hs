@@ -26,7 +26,7 @@ data App = App
   { _appLogFunc :: !LogFunc
   , _appProcessContext :: !ProcessContext
   , _appOptions :: !Options
-  , _appClCmd :: Execute -> IO UUID
+  , _appClCmd :: Execute -> IO ByteString
   }
 
 makeLenses ''App
@@ -59,14 +59,30 @@ instance Exec (RIO App) Text where
     return ustr
   clRun vn depMap cmd = do
     clcmd <- view appClCmd
-    resid <- tshow <$> liftIO (clcmd execCmd)
+    execRes <- liftIO (clcmd execCmd)
+    let uuid = maybe (Left (stringException "No valid UUID returned!")) Right (byteToUUID execRes)
+    resid <- tshow <$> fromEither uuid
     appLog (Assign [EntVerbatim vn, EntParen (EntUUID resid)] (EntVerbatim <$> cmdTxt))
     return resid
    where
-    fromEle e = case e of
-      Plain t        -> t
-      BundleRef r ps -> buildPath (r : ps)
     cmdTxt = fromEle <$> cmd
     fromDep (Deps u subs) = buildPath (u : subs)
     depTxt  = M.toList (fromDep <$> depMap)
     execCmd = ExecRun depTxt cmdTxt [ClName vn]
+  clCat vn val = do
+    clcmd <- view appClCmd
+    res <- liftIO (clcmd execCmd)
+    let resText = decodeUtf8Lenient res
+    appLog (Assign [EntVerbatim vn] [EntVerbatim (tshow resText)])
+    return (RuntimeString resText)
+    where
+      execCmd = ExecCat (fromDeps val)
+
+fromDeps :: Deps Text -> Text
+fromDeps (Deps r ps) = fromEle (BundleRef r ps)
+
+fromEle :: CMDEle Text -> Text
+fromEle e = case e of
+    Plain t        -> t
+    BundleRef r ps -> buildPath (r : ps)
+      
