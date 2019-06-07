@@ -183,14 +183,23 @@ instance Arbitrary ParserTest where
     return (ParserTest randCv randStr)
 
 -- arbitrary RandCoda after type check
-newtype RandCodaTypeCheck = RandCodaTypeCheck CodaVal
+data RandCodaTypeCheck = RandCodaTypeCheck CodaVal CodaVal
     deriving (Show, Read, Eq)
 instance Arbitrary RandCodaTypeCheck where
   arbitrary = do
     (RandCoda _ cv) <- arbitrary
     case testTypeCheckVal cv of
-      Right v -> return (RandCodaTypeCheck v)
+      Right v -> return (RandCodaTypeCheck cv v)
       _ -> error "rand gen error"
+
+-- rcoed cv
+data RandCodaRCO = RandCodaRCO CodaVal CodaVal
+      deriving (Show, Read, Eq)
+instance Arbitrary RandCodaRCO where
+  arbitrary = do
+    RandCodaTypeCheck old cv <- arbitrary
+    return (RandCodaRCO old (testRCO cv))
+
 -- short functions for writing expression
 
 instance IsString CodaVal where
