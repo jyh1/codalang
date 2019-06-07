@@ -67,6 +67,11 @@ prepLetRhs vn cv = case cv of
     Cl (ClCat val) -> do
         valDep <- toDep <$> runCoda val
         lift (clCat vn valDep)
+    Convert val BundleDic{} -> do
+        valRes <- runCoda val
+        case valRes of
+            RuntimeString t -> prepLetRhs vn (Lit (BundleName t))
+            RuntimeBundle{} -> return valRes
     Dir{} -> runCoda cv
     Str{} -> runCoda cv
     Lit u -> lift (emptyBundle <$> clLit vn u)
