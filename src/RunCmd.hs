@@ -12,15 +12,18 @@ import Lang.Lang
 cmdExec :: Execute -> IO ByteString
 cmdExec exec = case exec of
     ExecRun env cmd opts ->
-        runProcess process
+        procStdout process
         where
             (subcmd, cmdstr) = buildRunCmd cmd
             envstr = buildEnv env
             optArgs = makeOptArgs opts
             process = P.proc "cl" (concat [[subcmd], optArgs, envstr, [cmdstr]])
-    ExecCat v -> runProcess (makeProc ["cat", T.unpack v])
+    ExecCat v -> do
+        let vstr = T.unpack v
+        P.runProcess_ (makeProc ["wait", vstr])
+        procStdout (makeProc ["cat", vstr])
     where
-        runProcess pro = do
+        procStdout pro = do
             (res, _) <- P.readProcess_ pro
             return (toStrictBytes res)
         makeProc = P.proc "cl"
