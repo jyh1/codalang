@@ -66,7 +66,7 @@ prepLetRhs vn cv = case cv of
                 varVal = M.fromList (swap <$> M.toList valVar)
     Cl (ClCat val) -> do
         valDep <- toDep <$> runCoda val
-        RuntimeString <$> lift (clCat vn valDep)
+        lift (clCat vn valDep)
     Dir{} -> runCoda cv
     Str{} -> runCoda cv
     Lit u -> lift (emptyBundle <$> clLit vn u)
