@@ -69,6 +69,7 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         return (makeRun <$> (coSequenceT typeBundle es'))
         where
             makeRun = Cl . Run
+    cl (ClCat _) = error "Cat command during type check"
     dir val sub = case resType val of
         TypeString -> throwErr (TypeError (Mismatch typeBundle TypeString) ast)
         BundleDic{} -> return (fmapT typeBundle (`Dir` sub) val)
