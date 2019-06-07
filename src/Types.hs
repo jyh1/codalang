@@ -84,6 +84,6 @@ fromDeps (Deps r ps) = buildPath (r : ps)
 
 fromEle :: CMDEle Text -> Text
 fromEle e = case e of
-    Plain t        -> T.replace "\n" " " t
+    Plain t        -> t
     BundleRef r ps -> fromDeps (Deps r ps)
       
