@@ -13,9 +13,6 @@ cmdExec :: Execute -> IO ByteString
 cmdExec exec = case exec of
     ExecRun env cmd opts ->
         runProcess process
-        -- case byteToUUID resstr of
-        --     Just uuid -> return uuid
-        --     Nothing -> throwString "No valid UUID returned!"
         where
             (subcmd, cmdstr) = buildRunCmd cmd
             envstr = buildEnv env

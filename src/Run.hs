@@ -5,6 +5,7 @@ module Run (run) where
 
 import RIO
 import qualified RIO.Text as T
+import Control.Lens (bimap)
 
 import Types
 import Lang.Lang
@@ -16,14 +17,12 @@ run = do
   parsed <- loadFile source
   codaAST <- maybe (throwString "") return parsed
   logInfo "type checking"
-  runTypeCheck codaAST
+  tcAST <- runTypeCheck codaAST
   logInfo "remove-complex-operation"
-  let rcoAST = runRCO codaAST
+  let rcoAST = runRCO tcAST
   res <- evalCoda rcoAST :: RIO App (RuntimeRes Text)
   logInfo (display (tshow res))
 
   -- logInfo "Codalang"
-runTypeCheck :: (MonadIO m) => CodaVal -> m ()
-runTypeCheck cv = case (typeCheck cv) of
-  Left err -> throwString (T.unpack err) >> return ()
-  Right _ -> return ()
+runTypeCheck :: (MonadIO m) => CodaVal -> m CodaVal
+runTypeCheck cv = fromEither (bimap (stringException . T.unpack) snd (typeCheck cv))
