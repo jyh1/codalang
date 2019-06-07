@@ -68,7 +68,9 @@ instance (Pretty CodaType) where
             dicLis = [ sep [cat [pretty k, ":"], pretty v] | (k, v) <- M.toList dic]
 
 instance CodaLangEnv PPPass PPrint where
-    lit u = ranno LitAnno (pretty (show u))
+    lit u = case u of
+        UUID{} -> ranno LitAnno (pretty (show u))
+        BundleName n -> foldCoda (Convert (Str n) typeBundle)
     -- var :: VarName -> m a
     var vn = do
         c <- use (envL . at vn . to (fromMaybe errmsg))
