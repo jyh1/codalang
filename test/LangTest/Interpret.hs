@@ -64,7 +64,7 @@ instance CodaLangEnv InterApp CodaTestRes where
     convert val vt = case vt of
         BundleDic{} -> case val of
             StrRes s -> return (BunRes (BundleName s))
-            CatRes i -> return (RunRes i)
+            CatRes i -> return (CatRes i)
             _ -> return val
         TypeString -> case val of
             StrRes{} -> return val
@@ -101,14 +101,16 @@ instance Exec InterApp CodaTestRes where
                         let eleDep = view (at eleVar . to (fromMaybe undefined)) deps in 
                             fromDep eleDep ps
                             
-            fromDep (Deps tres depPath) elePath
-                | null ps = tres
-                | otherwise = case tres of
-                    DirRes r sub -> DirRes r (sub ++ ps)
-                    _ -> DirRes tres ps
-                where
-                    ps = depPath ++ elePath
     clLit _ u = return (BunRes u)
+    clCat _ v = (`RuntimeBundle` []) <$> runCat (fromDep v [])
+
+fromDep (Deps tres depPath) elePath
+    | null ps = tres
+    | otherwise = case tres of
+        DirRes r sub -> DirRes r (sub ++ ps)
+        _ -> DirRes tres ps
+    where
+        ps = depPath ++ elePath
 
 testInterpretWIntrfc :: CodaVal -> ([CmdLog CodaTestRes], CodaTestRes)
 testInterpretWIntrfc cv = (_cmdlog env, newRes)

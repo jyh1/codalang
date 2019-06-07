@@ -114,12 +114,12 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
         simpRCOTest (clet (simpRun "k") [("k", d 2 ["a"])]) 
             (clet (tmpNV 3) [("k-1", 2 ), ("k-2", d "k-1" ["a"]), (tmpN 3, simpRun "k-2")])
     it "random_gen_RCO" $ property
-        (\(RandCodaTypeCheck _ cv) -> checkRCO (testRCO cv))
+        (\(RandCodaRCO _ cv) -> checkRCO cv)
     it "same_result_after_RCO" $ property
-        (\(RandCodaTypeCheck _ cv) -> dummyInterpret (testRCO cv) == dummyInterpret cv)
+        (\(RandCodaRCO old cv) -> dummyInterpret old == dummyInterpret cv)
 
 interpretInterface :: Spec
 interpretInterface = do
     it "same_result_with_two_interpreters" $ property
-        (\(RandCoda _ cv) -> 
-            let rcoCV = testRCO cv in dummyInterpret rcoCV == dummyInterpretWIntfrc rcoCV)
+        (\(RandCodaRCO old cv) -> 
+            dummyInterpret cv == dummyInterpretWIntfrc cv)
