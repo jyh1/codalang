@@ -70,7 +70,7 @@ bundleLit = highlight Constant uuidlit
         uuidlit = token ((PLit <$> bundleName) <?> "UUID or bundle name")
 
 varChar :: (TokenParsing m) => m Char
-varChar = alphaNum <|> oneOf "_."
+varChar = alphaNum <|> oneOf "_.-"
 
 varName :: (TokenParsing m) => m Text
 varName = highlight Identifier (T.pack <$> varname <?> "variable_name")
