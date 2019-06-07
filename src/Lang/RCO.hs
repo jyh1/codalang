@@ -15,7 +15,8 @@ where
     -- value := bundle | str
     -- cmdRCO := Cmd value
     -- dirRCO := Dir bundle text
-    -- letRCO := Let var (cmdRCO | dirRCO | lit | str) rco
+    -- convert := Convert (lit | var | bundle) type
+    -- letRCO := Let var (cmdRCO | dirRCO | lit | str | convert) rco
     -- rco := value | letRCO
 
 import           Control.Monad.State            ( StateT
@@ -71,7 +72,11 @@ type LetRhs = CodaVal
 type NameBinding = (Text, LetRhs)
 type NameBindings = S.Seq NameBinding
 type Path = S.Seq Text
-data RCOVal = RCOLit UUID | RCOVar VarName | RCOCmd CmdRCO | RCODir VarName Path | RCOStr Text
+data RCOVal = RCOLit UUID 
+    | RCOVar VarName 
+    | RCOCmd CmdRCO 
+    | RCODir VarName Path 
+    | RCOStr Text
 data RCO a = RCO NameBindings a
     deriving (Show, Eq, Read, Functor)
 instance (Applicative RCO) where
@@ -118,6 +123,11 @@ toValue (RCODir bname subdirs) = return $ case subdirs of
 toValue (RCOStr t) = return (Str t)
 toValue rest = Var <$> toVarName rest
 
+-- (lit | dir | var)
+toLitValue :: RCOVal -> RCOPass Value
+toLitValue (RCOLit u) = return (Lit u)
+toLitValue val = toValue val
+
 toSubDir :: RCOVal -> RCOPass (VarName, Path)
 toSubDir (RCODir bname subdirs) = return (bname, subdirs)
 toSubDir rest                   = do
@@ -136,12 +146,21 @@ instance CodaLangEnv RCOPass RCORes where
                 )
     cl (Run cmd) = RCOCmd <$> rcocmd
         where rcocmd = Run <$> traverse (>>= toValue) cmd
+    cl (ClCat bud) = error "Unexpected cat command in RCO"
     dir val subdir = do
         (newn, path) <- toSubDir val
         return (RCODir newn (path S.|> subdir))
     clet vname val body = do
         newns <- withLocal vname (val >>= toVarName)
         withVar vname newns body
-
-
-
+    convert val t = do
+        cval <- toLitValue val
+        let conv = RCOVar <$> bindName (Convert cval t)
+            catCmd = return (RCOCmd (ClCat cval))
+        case (cval, t) of
+            (Lit{}, TypeString) -> catCmd
+            (Var{}, TypeString) -> catCmd
+            (Var{}, BundleDic{}) -> conv
+            (Dir{}, TypeString) -> catCmd
+            (Str s, BundleDic{}) -> return (RCOLit (BundleName s))
+            _ -> error "errors in RCO convert"
