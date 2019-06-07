@@ -64,12 +64,18 @@ prepLetRhs vn cv = case cv of
                 valVar = M.fromList (swap <$> deps)
                 depToVar dep = fromJust (M.lookup dep valVar)
                 varVal = M.fromList (swap <$> M.toList valVar)
-
+    Cl (ClCat val) -> do
+        valDep <- toDep <$> runCoda val
+        RuntimeString <$> lift (clCat vn valDep)
     Dir{} -> runCoda cv
     Str{} -> runCoda cv
     Lit u -> lift (emptyBundle <$> clLit vn u)
     _     -> error "Impossible happened: not RCO expr in let assignment"
 
+
+toDep :: RuntimeRes a -> Deps a
+toDep (RuntimeBundle a b) = Deps a b
+toDep _ = error "runtime type error!"
 
 getPath :: [Text] -> CodaVal -> (Text, [Text])
 getPath ps val = case val of
