@@ -20,7 +20,7 @@ cmdExec exec = case exec of
             process = P.proc "cl" (concat [[subcmd], optArgs, envstr, [cmdstr]])
     ExecCat v -> do
         let vstr = T.unpack v
-        P.runProcess_ (makeProc ["wait", vstr])
+        P.runProcess_ (P.setStdout P.createPipe (makeProc ["wait", vstr]))
         procStdout (makeProc ["cat", vstr])
     where
         procStdout pro = do
