@@ -10,6 +10,7 @@ module Types where
 import           RIO                     hiding ( view )
 import qualified RIO.Text as T
 import qualified RIO.Text.Partial as T
+import RIO.Char (showLitChar)
 import           RIO.Process
 import qualified RIO.Map                       as M
 import           Control.Lens
@@ -39,6 +40,8 @@ instance HasProcessContext App where
 
 data LogEnt = EntVerbatim Text | EntUUID Text | EntParen LogEnt
   deriving (Show, Read, Eq)
+escapeVerbatim :: Text -> LogEnt
+escapeVerbatim t = EntVerbatim (T.pack (T.foldr showLitChar "" t))
 data LogInfo = Assign [LogEnt] [LogEnt]
   deriving (Show, Read, Eq)
 
@@ -63,7 +66,7 @@ instance Exec (RIO App) Text where
     execRes <- liftIO (clcmd execCmd)
     let uuid = maybe (Left (stringException "No valid UUID returned!")) Right (byteToUUID execRes)
     resid <- tshow <$> fromEither uuid
-    appLog (Assign [EntVerbatim vn, EntParen (EntUUID resid)] (EntVerbatim <$> cmdTxt))
+    appLog (Assign [EntVerbatim vn, EntParen (EntUUID resid)] (escapeVerbatim <$> cmdTxt))
     return resid
    where
     cmdTxt = map fromEle cmd
