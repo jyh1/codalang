@@ -49,6 +49,7 @@ data CodaVal = Lit UUID
     | Dir CodaVal Text
     | Let VarName CodaVal CodaVal
     | Convert CodaVal CodaType
+    | Dict (Map Text CodaVal)
     deriving (Eq, Ord, Read, Show)
 
 tmpName :: Text
