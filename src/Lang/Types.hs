@@ -55,10 +55,12 @@ data CodaVal = Lit UUID
 tmpName :: Text
 tmpName = "codalang"
 
-data CodaType = TypeString | BundleDic (Map Text CodaType)
+data TypeDict = TAll | TDict (Map Text CodaType)
+    deriving (Eq, Ord, Read, Show)
+data CodaType = TypeString | BundleDic TypeDict
     deriving (Eq, Ord, Read, Show)
 typeBundle :: CodaType
-typeBundle = BundleDic mempty
+typeBundle = BundleDic TAll
 
 data CodaResult = ResStr Text | ResBundle UUID
     deriving (Eq, Ord, Read, Show)
