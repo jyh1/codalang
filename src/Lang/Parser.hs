@@ -33,6 +33,7 @@ data ParseRes = PLit Text
     | PRun [ParseRes]
     | PDir ParseRes [Text]
     | PConv ParseRes [CodaType]
+    | PDict (Map Text ParseRes)
     deriving (Show, Read, Eq, Ord)
 
 fromParseRes :: ParseRes -> CodaVal
@@ -48,6 +49,7 @@ fromParseRes res = case res of
     PConv val ts -> case ts of
         [] -> fromParseRes val
         _ -> foldl' Convert (fromParseRes val) ts
+    PDict d -> Dict (fromParseRes <$> d)
 
 optionalFollowed :: (a -> b -> a) -> a -> Maybe b -> a
 optionalFollowed f a m = case m of
@@ -137,6 +139,9 @@ normalExpr =
         <?> "regular codalang expression"
 
 
+dictKey :: (TokenParsing m) => m Text
+dictKey = T.pack <$> (some fileNameChar) <?> "type dictionary key"
+
 typeAnnotation :: (TokenParsing m) => m CodaType
 typeAnnotation = hasAnnot <?> "type annotation"
     where
@@ -145,11 +150,15 @@ typeAnnotation = hasAnnot <?> "type annotation"
         typeExpr = typeStr <|> typeBun <?> "type expression"
             where
                 typeStr = makeKeyword "String" $> TypeString
-                typeKey = T.pack <$> (some fileNameChar) <?> "type dictionary key"
-                typeBun = BundleDic . M.fromList <$> parseDicSyntax (token typeKey) (token typeExpr)
+                typeBun = BundleDic . M.fromList <$> parseDicSyntax (token dictKey) (token typeExpr)
+
+dictExpr :: (TokenParsing m) => m ParseRes
+dictExpr = do
+    let dict = M.fromList <$> parseDicSyntax (token dictKey) codaExpr
+    PDict <$> dict <?> "dictionary"
 
 codaExpr :: (TokenParsing m) => m ParseRes
-codaExpr = dirExpr
+codaExpr = dictExpr <|> dirExpr
 
 codaParser :: Parser CodaVal
 codaParser = fromParseRes <$> (spaces *> codaExpr)
