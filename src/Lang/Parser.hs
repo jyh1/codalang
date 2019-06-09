@@ -147,10 +147,12 @@ typeAnnotation = hasAnnot <?> "type annotation"
     where
         hasAnnot = symbol "::" *> typeExpr
         typeExpr :: (TokenParsing m) => m CodaType
-        typeExpr = typeStr <|> typeBun <?> "type expression"
+        typeExpr = typeStr <|> typeBunDict <?> "type expression"
             where
                 typeStr = makeKeyword "String" $> TypeString
-                typeBun = BundleDic . M.fromList <$> parseDicSyntax (token dictKey) (token typeExpr)
+                typeBun = BundleDic . TDict . M.fromList <$> parseDicSyntax (token dictKey) (token typeExpr)
+                typeBunAll = braces (symbol "_") $> BundleDic TAll
+                typeBunDict = try typeBunAll <|> typeBun
 
 dictExpr :: (TokenParsing m) => m ParseRes
 dictExpr = do
