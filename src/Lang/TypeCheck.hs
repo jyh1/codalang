@@ -10,6 +10,7 @@ import           Control.Monad.State
 import           RIO                     hiding ( to )
 import           Control.Lens
 import qualified RIO.Text                      as T
+import qualified RIO.Map                       as M
 import           RIO.List                       ( unzip )
 
 import           Lang.Types
@@ -18,6 +19,8 @@ import           Lang.PPrint                    ( pprintCoda )
 
 data TypeErrorInfo = UnDef
     | Mismatch {expected :: CodaType, current :: CodaType}
+    | KeyError {usedKey :: Text}
+    | TypeCastError {origin :: CodaType, target :: CodaType}
     deriving (Read, Eq, Typeable)
 
 data TypeError = TypeError TypeErrorInfo CodaVal
@@ -32,6 +35,17 @@ instance Show TypeError where
             , "Actual type: " <> tshow curr
             , "In the expression: "
             , astStr
+            ]
+        KeyError k -> T.unlines
+            [ "Undefined key: " <> k
+            , "In the expression:"
+            , astStr
+            ]
+        TypeCastError o t -> T.unlines
+            [ "Unable to cast type:"
+            , tshow o
+            , "to type:"
+            ,  tshow t
             ]
         where astStr = pprintCoda ast
 
@@ -72,19 +86,37 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
     cl (ClCat _) = error "Cat command during type check"
     dir val sub = case resType val of
         TypeString -> throwErr (TypeError (Mismatch typeBundle TypeString) ast)
-        BundleDic{} -> return (fmapT typeBundle (`Dir` sub) val)
+        BundleDic d -> case d of
+            TAll -> return (tagType typeBundle)
+            TDict dic -> do
+                let dicEle = (return . tagType) <$> M.lookup sub dic
+                fromMaybe (throwErr (TypeError (KeyError sub) ast)) dicEle
         where
             ast = resOrig val
+            tagType t = fmapT t (`Dir` sub) val
     clet vn val body = do
         valRes <- val
         bodyRes <- withVar vn (resType valRes) body
         return (liftRes2 (Let vn) valRes bodyRes)
     convert val vt
-        | normType (resType val) == normType vt = return val
-        | otherwise = return (fmapT vt (`Convert` vt) val)
+        | valType == vt = return val
+        | convertable valType vt = return (fmapT vt (`Convert` vt) val)
+        | otherwise = throwErr (TypeError (TypeCastError valType vt) (resOrig val))
         where
-            normType BundleDic{} = typeBundle
-            normType t = t
+            valType = resType val
+            convertable t1 t2 = case (t1, t2) of
+                (TypeString, _) -> True
+                (_, TypeString) -> True
+                (BundleDic d1, BundleDic d2) -> d2 `isSubsetOf` d1
+            isSubsetOf d1 d2 = case (d1, d2) of
+                (_, TAll) -> True
+                (TAll, _) -> False
+                (TDict td1, TDict td2) -> M.null (td1 `M.difference` td2)
+    dict d = do
+        let td = resType <$> d
+            tv = resVal <$> d
+            torig = resOrig <$> d
+        return (TCRes {resType = BundleDic (TDict td), resVal = Dict tv, resOrig = Dict torig})
 
 typeCheck :: CodaVal -> Either Text (CodaType, CodaVal)
 typeCheck cv = case res of
