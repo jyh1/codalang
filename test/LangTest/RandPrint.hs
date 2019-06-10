@@ -28,6 +28,7 @@ data RendCoda = Parens RendCoda
     | RLet [RendCoda] RendCoda
     | ColonAnnot Text RendCoda RendCoda
     | RType CodaType
+    | RDic (Map Text RendCoda)
     deriving (Show, Read, Eq, Ord)
 
 -- | symbol that could be surrounded with spaces
@@ -69,10 +70,13 @@ doRend rc = case rc of
     ColonAnnot t val anot -> doRend (RLis [val, spaceSymbol t, anot])
     RType ct -> case ct of
         TypeString -> doRend (spaceSymbol "String")
-        BundleDic dic -> doRend (enloseParen "{" "}" (RLis annotComma))
-            where
-                annotLis = [singleColon (spaceSymbol k) (RType v) | (k, v) <- M.toList dic]
-                annotComma = intersperse (spaceSymbol ",") annotLis
+        BundleDic dic -> case dic of
+            TAll -> doRend (enloseParen "{" "}" (spaceSymbol "_"))
+            TDict d -> doRend (RDic (RType <$> d))
+    RDic dic -> doRend (enloseParen "{" "}" (RLis annotComma))
+        where
+            annotLis = [singleColon (spaceSymbol k) v | (k, v) <- M.toList dic]
+            annotComma = intersperse (spaceSymbol ",") annotLis
     where
         nTimes :: Int -> (a -> a) -> (a -> a)
         nTimes 0 _ = id
@@ -153,6 +157,7 @@ rendCoda cv = case cv of
             rendVal = case val of
                 Let{} -> Parens1 (rendCoda val)
                 _ -> rendCoda val
+    Dict d -> entity (RDic (rendCoda <$> d))
 
 randomPrintCoda :: CodaVal -> Gen String
 randomPrintCoda = doRend . rendCoda
