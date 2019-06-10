@@ -135,7 +135,7 @@ dirExpr = highlight LiterateSyntax (token dirWithType) <?> "codalang expression"
 
 normalExpr :: (TokenParsing m) => m ParseRes
 normalExpr =
-    (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr)
+    (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr <|> dictExpr)
         <?> "regular codalang expression"
 
 
@@ -160,7 +160,7 @@ dictExpr = do
     PDict <$> dict <?> "dictionary"
 
 codaExpr :: (TokenParsing m) => m ParseRes
-codaExpr = dictExpr <|> dirExpr
+codaExpr = dirExpr
 
 codaParser :: Parser CodaVal
 codaParser = fromParseRes <$> (spaces *> codaExpr)
