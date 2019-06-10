@@ -135,17 +135,18 @@ randLet t = do
 
 randConvert :: CodaType -> GenEnv CodaVal
 randConvert t = do
-  newt <- lift (convertable t)
+  newt <- lift randType
   val <- decDepth (randTree newt)
   return (Convert val t)
-  where
-    convertable :: CodaType -> Gen CodaType
-    convertable TypeString = randType
-    convertable (BundleDic d) = frequency [(1, return TypeString), (5, BundleDic <$> extendDict d)]
-    extendDict :: TypeDict -> Gen TypeDict
-    extendDict d = case d of
-      TAll -> return TAll
-      TDict dict -> frequency [(3, TDict . (dict `M.union`) <$> randTypeDic), (3, pure d), (1, pure TAll)]
+  -- where
+    -- convertable :: CodaType -> Gen CodaType
+    -- convertable TypeString = randType
+    -- convertable (BundleDic d) = frequency [(1, return TypeString), (5, BundleDic <$> extendDict d)]
+    
+extendDict :: TypeDict -> Gen TypeDict
+extendDict d = case d of
+  TAll -> return TAll
+  TDict dict -> frequency [(3, TDict . (dict `M.union`) <$> randTypeDic), (3, pure d), (1, pure TAll)]
 
 randValDict :: Map Text CodaType -> GenEnv CodaVal
 randValDict d = 
@@ -182,7 +183,8 @@ randTypeDic = M.fromList <$> (resize 3 (listOf randDicEle))
 randTypeDicWith :: CodaType -> Gen (TypeDict, VarName)
 randTypeDicWith t = do
   newN <- randDicKey
-  dic <- oneof [(TDict . M.insert newN t) <$> randTypeDic, return TAll]
+  let dicVal = (TDict . M.insert newN t) <$> randTypeDic
+  dic <- dicVal
   return (dic, newN)
 
 randCodaVal :: GenEnv (CodaType, CodaVal)
@@ -216,9 +218,7 @@ data RandCodaTypeCheck = RandCodaTypeCheck CodaVal CodaVal
 instance Arbitrary RandCodaTypeCheck where
   arbitrary = do
     (RandCoda _ cv) <- arbitrary
-    case testTypeCheckVal cv of
-      Right v -> return (RandCodaTypeCheck cv v)
-      _ -> error "rand gen error"
+    return (RandCodaTypeCheck cv (testTypeCheckVal cv))
 
 -- rcoed cv
 data RandCodaRCO = RandCodaRCO CodaVal CodaVal
@@ -335,8 +335,11 @@ testPPrintShow = show . codaToDoc
 testPPrintCompact :: CodaVal -> String
 testPPrintCompact cv = T.unpack (renderStrict (layoutCompact (codaToDoc cv)))
 
-testTypeCheck :: CodaVal -> Either Text CodaType
-testTypeCheck = (fmap fst) <$> typeCheck
+testTypeCheck :: CodaVal -> CodaType
+testTypeCheck c = either (error . T.unpack) fst (typeCheck c)
 
-testTypeCheckVal :: CodaVal -> Either Text CodaVal
-testTypeCheckVal = (fmap snd) <$> typeCheck
+testTypeCheckVal :: CodaVal -> CodaVal
+testTypeCheckVal c = either (error . T.unpack) snd (typeCheck c)
+
+typeCompat :: CodaType -> CodaType -> Bool
+typeCompat = isSubtypeOf
