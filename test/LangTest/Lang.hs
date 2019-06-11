@@ -77,7 +77,7 @@ randLeaf c = genLeaf c (constLeaf c)
     genLeaf :: CodaType -> [GenEnv CodaVal] -> GenEnv CodaVal
     genLeaf t others = do
       gm <- use envL
-      let vs = [v | (v, t') <- M.toList gm, t `isSubtypeOf` t']
+      let vs = [v | (v, t') <- M.toList gm, t' `isSubtypeOf` t]
       case vs of
         [] -> oneofGenEnv others
         _ -> oneofGenEnv ((lift (Var <$> elements vs)) : others)

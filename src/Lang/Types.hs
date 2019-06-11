@@ -13,8 +13,7 @@ module Lang.Types where
 import           RIO
 import qualified RIO.Text as T
 import qualified RIO.Map as M
-import           Control.Lens                   ( makeLenses
-                                                )
+import           Control.Lens
 
 -- UUID of CodaLab bundle
 data UUID = UUID Text | BundleName Text
@@ -66,6 +65,7 @@ isSubtypeOf (TypeRecord d1) (TypeRecord d2) =
     M.null (M.differenceWith maybediff d2 d1)
     where
         maybediff t2 t1 = bool (Just t2) Nothing (t1 `isSubtypeOf` t2)
+isSubtypeOf TypeBundle (TypeRecord d1) = allOf traverse (TypeBundle `isSubtypeOf`) d1
 isSubtypeOf t1 t2 = t1 == t2
 
 data CodaResult = ResStr Text | ResBundle UUID

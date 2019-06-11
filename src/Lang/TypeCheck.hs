@@ -70,7 +70,7 @@ throwErr :: TypeError -> TCPass a
 throwErr err = lift (Left err)
 
 instance CodaLangEnv TCPass (TCRes CodaVal) where
-    -- lit u = return (makeRes typeBundle (Lit u))
+    lit u = return (makeRes TypeBundle (Lit u))
     var vn = do
         varType <- use (envL . at vn)
         maybe err getRes varType
@@ -80,19 +80,16 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
     str k = return (makeRes TypeString (Str k))
     cl (Run es) = do
         es' <- sequence es
-        -- return (makeRun <$> (coSequenceT typeBundle es'))
-        undefined
+        return (makeRun <$> (coSequenceT TypeBundle es'))
         where
             makeRun = Cl . Run
     cl (ClCat _) = error "Cat command during type check"
     dir val sub = case resType val of
-        _ -> undefined
-        -- TypeString -> throwErr (TypeError (Mismatch typeBundle TypeString) ast)
-        -- BundleDic d -> case d of
-        --     TAll -> return (tagType typeBundle)
-        --     TDict dic -> do
-        --         let dicEle = (return . tagType) <$> M.lookup sub dic
-        --         fromMaybe (throwErr (TypeError (KeyError sub) ast)) dicEle
+        TypeString -> throwErr (TypeError (Mismatch TypeBundle TypeString) ast)
+        TypeBundle -> return (tagType TypeBundle)
+        TypeRecord dic -> do
+            let dicEle = (return . tagType) <$> M.lookup sub dic
+            fromMaybe (throwErr (TypeError (KeyError sub) ast)) dicEle
         where
             ast = resOrig val
             tagType t = fmapT t (`Dir` sub) val
@@ -100,17 +97,12 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         valRes <- val
         bodyRes <- withVar vn (resType valRes) body
         return (liftRes2 (Let vn) valRes bodyRes)
-    convert val vt
-        | valType == vt = return val
-        | otherwise = return (fmapT vt (`Convert` vt) val)
-        where
-            valType = resType val
+    convert val vt = return (fmapT vt (`Convert` vt) val)
     dict d = do
         let td = resType <$> d
             tv = resVal <$> d
             torig = resOrig <$> d
-        -- return (TCRes {resType = TypeRecord td, resVal = Dict tv, resOrig = Dict torig})
-        undefined
+        return (TCRes {resType = TypeRecord td, resVal = Dict tv, resOrig = Dict torig})
 
 typeCheck :: CodaVal -> Either Text (CodaType, CodaVal)
 typeCheck cv = case res of
