@@ -21,7 +21,13 @@ import Lang.Types
 import Lang.Fold
 import Lang.Interpret
 
-data CodaTestRes = BunRes UUID | RunRes Int | DirRes CodaTestRes [Text] | StrRes Text | VarRes Text | CatRes Int
+data CodaTestRes = BunRes UUID 
+    | RunRes Int 
+    | DirRes CodaTestRes [Text] 
+    | StrRes Text 
+    | VarRes Text 
+    | CatRes Int
+    | DictRes (Map Text CodaTestRes)
     deriving (Show, Read, Eq, Ord)
 
 data CmdLog a = LogRun [a] | LogCat a
@@ -56,20 +62,30 @@ instance CodaLangEnv InterApp CodaTestRes where
                 RunRes <$> getCounter
             ClCat val -> runCat val
     dir val sub = return $ case val of
+        DictRes d -> fromMaybe keepDirRes (M.lookup sub d)
         DirRes v subs -> DirRes v (subs ++ [sub])
-        other -> DirRes other [sub]
+        _ -> keepDirRes
+        where
+            keepDirRes = DirRes val [sub]
     clet varn val body = do
         valres <- val
         withVar varn valres body
-    convert val vt = case vt of
-        BundleDic{} -> case val of
-            StrRes s -> return (BunRes (BundleName s))
-            CatRes i -> return (CatRes i)
-            _ -> return val
-        TypeString -> case val of
-            StrRes{} -> return val
-            CatRes{} -> return val
-            _ -> runCat val
+    convert val vt = makeConvert val vt
+        where
+            makeConvert val vt = case vt of
+                TypeString -> case val of
+                    StrRes{} -> return val
+                    CatRes{} -> return val
+                    _ -> runCat val
+                BundleDic d -> case d of
+                    TAll -> case val of
+                        StrRes s -> return (BunRes (BundleName s))
+                        CatRes i -> return (RunRes i)
+                        _ -> return val
+                    TDict td -> 
+                        DictRes <$> sequence (M.mapWithKey (\k t -> dir val k >>= (`makeConvert` t)) td)
+    dict = return . DictRes
+
 
 runCat :: CodaTestRes -> InterApp CodaTestRes
 runCat val = do
