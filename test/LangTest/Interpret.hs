@@ -77,13 +77,13 @@ instance CodaLangEnv InterApp CodaTestRes where
                     StrRes{} -> return val
                     CatRes{} -> return val
                     _ -> runCat val
-                BundleDic d -> case d of
-                    TAll -> case val of
-                        StrRes s -> return (BunRes (BundleName s))
-                        CatRes i -> return (RunRes i)
-                        _ -> return val
-                    TDict td -> 
-                        DictRes <$> sequence (M.mapWithKey (\k t -> dir val k >>= (`makeConvert` t)) td)
+                -- BundleDic d -> case d of
+                --     TAll -> case val of
+                --         StrRes s -> return (BunRes (BundleName s))
+                --         CatRes i -> return (RunRes i)
+                --         _ -> return val
+                --     TDict td -> 
+                --         DictRes <$> sequence (M.mapWithKey (\k t -> dir val k >>= (`makeConvert` t)) td)
     dict = return . DictRes
 
 

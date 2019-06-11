@@ -70,9 +70,8 @@ doRend rc = case rc of
     ColonAnnot t val anot -> doRend (RLis [val, spaceSymbol t, anot])
     RType ct -> case ct of
         TypeString -> doRend (spaceSymbol "String")
-        BundleDic dic -> case dic of
-            TAll -> doRend (enloseParen "{" "}" (spaceSymbol "_"))
-            TDict d -> doRend (RDic (RType <$> d))
+        TypeBundle -> doRend (enloseParen "{" "}" (spaceSymbol "_"))
+        TypeRecord d -> doRend (RDic (RType <$> d))
     RDic dic -> doRend (enloseParen "{" "}" (RLis annotComma))
         where
             annotLis = [singleColon (spaceSymbol k) v | (k, v) <- M.toList dic]

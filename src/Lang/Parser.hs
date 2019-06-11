@@ -150,8 +150,8 @@ typeAnnotation = hasAnnot <?> "type annotation"
         typeExpr = typeStr <|> typeBunDict <?> "type expression"
             where
                 typeStr = makeKeyword "String" $> TypeString
-                typeBun = BundleDic . TDict . M.fromList <$> parseDicSyntax (token dictKey) (token typeExpr)
-                typeBunAll = braces (symbol "_") $> BundleDic TAll
+                typeBun = TypeRecord . M.fromList <$> parseDicSyntax (token dictKey) (token typeExpr)
+                typeBunAll = braces (symbol "_") $> TypeBundle
                 typeBunDict = try typeBunAll <|> typeBun
 
 dictExpr :: (TokenParsing m) => m ParseRes

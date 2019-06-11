@@ -70,7 +70,7 @@ throwErr :: TypeError -> TCPass a
 throwErr err = lift (Left err)
 
 instance CodaLangEnv TCPass (TCRes CodaVal) where
-    lit u = return (makeRes typeBundle (Lit u))
+    -- lit u = return (makeRes typeBundle (Lit u))
     var vn = do
         varType <- use (envL . at vn)
         maybe err getRes varType
@@ -80,17 +80,19 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
     str k = return (makeRes TypeString (Str k))
     cl (Run es) = do
         es' <- sequence es
-        return (makeRun <$> (coSequenceT typeBundle es'))
+        -- return (makeRun <$> (coSequenceT typeBundle es'))
+        undefined
         where
             makeRun = Cl . Run
     cl (ClCat _) = error "Cat command during type check"
     dir val sub = case resType val of
-        TypeString -> throwErr (TypeError (Mismatch typeBundle TypeString) ast)
-        BundleDic d -> case d of
-            TAll -> return (tagType typeBundle)
-            TDict dic -> do
-                let dicEle = (return . tagType) <$> M.lookup sub dic
-                fromMaybe (throwErr (TypeError (KeyError sub) ast)) dicEle
+        _ -> undefined
+        -- TypeString -> throwErr (TypeError (Mismatch typeBundle TypeString) ast)
+        -- BundleDic d -> case d of
+        --     TAll -> return (tagType typeBundle)
+        --     TDict dic -> do
+        --         let dicEle = (return . tagType) <$> M.lookup sub dic
+        --         fromMaybe (throwErr (TypeError (KeyError sub) ast)) dicEle
         where
             ast = resOrig val
             tagType t = fmapT t (`Dir` sub) val
@@ -107,7 +109,8 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         let td = resType <$> d
             tv = resVal <$> d
             torig = resOrig <$> d
-        return (TCRes {resType = BundleDic (TDict td), resVal = Dict tv, resOrig = Dict torig})
+        -- return (TCRes {resType = TypeRecord td, resVal = Dict tv, resOrig = Dict torig})
+        undefined
 
 typeCheck :: CodaVal -> Either Text (CodaType, CodaVal)
 typeCheck cv = case res of

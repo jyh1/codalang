@@ -68,14 +68,14 @@ dictAnno ads = group (encloseSep (flatAlt "{ " "{") (flatAlt " }" "}") ", " dicL
 
 instance (Pretty CodaType) where
     pretty TypeString = "String"
-    pretty (BundleDic d) = case d of
-        TAll -> "{_}"
-        TDict dict -> dictAnno [ (pretty k, pretty v) | (k, v) <- M.toList dict]
+    -- pretty (BundleDic d) = case d of
+    --     TAll -> "{_}"
+    --     TDict dict -> dictAnno [ (pretty k, pretty v) | (k, v) <- M.toList dict]
 
 instance CodaLangEnv PPPass PPrint where
     lit u = case u of
         UUID{} -> ranno LitAnno (pretty (show u))
-        BundleName n -> foldCoda (Convert (Str n) typeBundle)
+        BundleName n -> foldCoda (Convert (Str n) TypeBundle)
     var vn = do
         c <- use (envL . at vn . to (fromMaybe errmsg))
         ranno (VarAnno vn c) (pretty vn)

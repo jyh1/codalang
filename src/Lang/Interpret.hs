@@ -67,7 +67,7 @@ prepLetRhs vn cv = case cv of
     Cl (ClCat val) -> do
         valDep <- toDep <$> runCoda val
         lift (clCat vn valDep)
-    Convert val BundleDic{} -> do
+    Convert val TypeRecord{} -> do
         valRes <- runCoda val
         case valRes of
             RuntimeString t -> prepLetRhs vn (Lit (BundleName t))

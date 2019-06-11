@@ -160,7 +160,7 @@ instance CodaLangEnv RCOPass RCORes where
         case (cval, t) of
             (Lit{}, TypeString) -> catCmd
             (Var{}, TypeString) -> catCmd
-            (Var{}, BundleDic{}) -> conv
+            (Var{}, TypeRecord{}) -> conv
             (Dir{}, TypeString) -> catCmd
-            (Str s, BundleDic{}) -> return (RCOLit (BundleName s))
+            (Str s, TypeRecord{}) -> return (RCOLit (BundleName s))
             _ -> error "errors in RCO convert"

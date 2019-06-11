@@ -72,29 +72,22 @@ randVarName =
     T.pack <$> liftA2 (:) alpha (resize 1 (listOf varSymbol))
 
 randLeaf :: CodaType -> GenEnv CodaVal
-randLeaf c = case c of
-  BundleDic td -> bundleLeaf td
-  TypeString -> strLeaf
+randLeaf c = genLeaf c (constLeaf c)
   where
-    genLeaf :: (CodaType -> Bool) -> [GenEnv CodaVal] -> GenEnv CodaVal
-    genLeaf f others = do
+    genLeaf :: CodaType -> [GenEnv CodaVal] -> GenEnv CodaVal
+    genLeaf t others = do
       gm <- use envL
-      let vs = [v | (v, t') <- M.toList gm, f t']
+      let vs = [v | (v, t') <- M.toList gm, t `isSubtypeOf` t']
       case vs of
         [] -> oneofGenEnv others
         _ -> oneofGenEnv ((lift (Var <$> elements vs)) : others)
-    strLeaf :: GenEnv CodaVal
-    strLeaf = genLeaf ( == TypeString) [lift (Str <$> randStr)]
+    constLeaf :: CodaType -> [GenEnv CodaVal]
+    constLeaf c = case c of
+      TypeBundle -> [lift (Lit <$> arbitrary)]
+      TypeRecord td -> [Dict <$> mapM randLeaf td]
+      TypeString -> [lift (Str <$> randStr)]
         where
           randStr = T.pack <$> (resize 5 (listOf arbitraryASCIIChar))
-    bundleLeaf :: TypeDict -> GenEnv CodaVal
-    bundleLeaf td = genLeaf isBundle leafDict
-      where
-        isBundle (BundleDic k) = td == k
-        isBundle _ = False
-        leafDict = case td of
-          TAll -> [lift (Lit <$> arbitrary)]
-          TDict k -> [Dict <$> mapM randLeaf k]
 
 -- non-leaf node
 childDepth :: (Int -> Int) -> GenEnv a -> GenEnv a
@@ -112,18 +105,29 @@ decDepth = childDepth (\x -> x - 1)
 randDir :: CodaType -> GenEnv CodaVal
 randDir t = do
   (tdic, var) <- lift (randTypeDicWith t)
-  bdl <- decDepth (randTree (BundleDic tdic))
+  bdl <- decDepth (randTree tdic)
   return (Dir bdl var)
+  where
+    randTypeDicWith :: CodaType -> Gen (CodaType, VarName)
+    randTypeDicWith t = do
+      newN <- randDicKey
+      let dicVal = (TypeRecord . M.insert newN t) <$> randTypeDic
+          dicGen = case t of
+            TypeBundle -> [dicVal, pure TypeBundle]
+            _          -> [dicVal]
+      ty <- oneof dicGen
+      return (ty, newN)
 
 randCl :: GenEnv CodaVal
 randCl = Cl <$> randCmd
   where
     randCmd :: GenEnv CodaCmd
     randCmd = do
-      cmdeles <- (`replicate` (snd <$> randCodaVal)) <$> lift (choose (1, 6))
+      cmdeles <- (`replicate` (pickType >>= randTree)) <$> lift (choose (1, 6))
       geneles <- zipWithM ($) reduceDepth cmdeles
       return (Run geneles)
       where
+        pickType = lift (elements [TypeBundle, TypeString])
         reduceDepth = decDepth : repeat halfDepth
 
 randLet :: CodaType -> GenEnv CodaVal
@@ -138,17 +142,8 @@ randConvert t = do
   newt <- lift randType
   val <- decDepth (randTree newt)
   return (Convert val t)
-  -- where
-    -- convertable :: CodaType -> Gen CodaType
-    -- convertable TypeString = randType
-    -- convertable (BundleDic d) = frequency [(1, return TypeString), (5, BundleDic <$> extendDict d)]
-    
-extendDict :: TypeDict -> Gen TypeDict
-extendDict d = case d of
-  TAll -> return TAll
-  TDict dict -> frequency [(3, TDict . (dict `M.union`) <$> randTypeDic), (3, pure d), (1, pure TAll)]
 
-randValDict :: Map Text CodaType -> GenEnv CodaVal
+randValDict :: TypeDict -> GenEnv CodaVal
 randValDict d = 
   Dict <$> (sequence $ M.fromList 
     [(k, dec (randTree t)) 
@@ -160,32 +155,28 @@ randTree t = do
   if n == 0 
     then randLeaf t 
     else case t of
-      BundleDic d -> randBundle d
+      TypeRecord d -> randRecord d
       TypeString -> randString
+      TypeBundle -> randBundle
   where
     -- non leaf bundle type
-    randBundle :: TypeDict -> GenEnv CodaVal
-    randBundle d = case d of
-      TAll -> oneofGenEnv [randCl, randDir t, randLet t, randConvert t]
-      TDict dic -> oneofGenEnv [randValDict dic, randDir t, randLet t, randConvert t]
+    randRecord :: TypeDict -> GenEnv CodaVal
+    randRecord dic = 
+      oneofGenEnv [randValDict dic, randDir t, randLet t, randConvert t]
       where
-        t = BundleDic d
+        t = TypeRecord dic
+    randBundle = oneofGenEnv [randCl, randDir t, randLet t, randConvert t]
     -- non leaf string
     randString :: GenEnv CodaVal
     randString = oneofGenEnv [randLet TypeString, randConvert TypeString, randDir TypeString]
 
 
 randType :: Gen CodaType
-randType = oneof [pure TypeString, pure (BundleDic TAll), BundleDic . TDict <$> randTypeDic]
+randType = oneof [pure TypeString, pure TypeBundle, TypeRecord <$> randTypeDic]
 randDicKey = frequency ((1, randVarName) : [(2, pure ("key" <> tshow i)) | i <- [1..3]])
 randDicEle = liftA2 (curry id) randDicKey randType
 randTypeDic = M.fromList <$> (resize 3 (listOf randDicEle))
-randTypeDicWith :: CodaType -> Gen (TypeDict, VarName)
-randTypeDicWith t = do
-  newN <- randDicKey
-  let dicVal = (TDict . M.insert newN t) <$> randTypeDic
-  dic <- dicVal
-  return (dic, newN)
+
 
 randCodaVal :: GenEnv (CodaType, CodaVal)
 randCodaVal = do
@@ -255,17 +246,12 @@ tmpN :: Int -> Text
 tmpN n = tmpName <> "-" <> tshow n
 tmpNV :: Int -> CodaVal
 tmpNV = Var . tmpN
-bd = BundleDic . TDict . M.fromList
-abd = BundleDic TAll
+bd = TypeRecord . M.fromList
+abd = TypeBundle
 cv = Convert
 ts = TypeString
-emptBd = BundleDic (TDict mempty)
+emptBd = TypeRecord mempty
 dict = Dict . M.fromList
-
-
-normType :: CodaType -> CodaType
-normType BundleDic{} = BundleDic TAll
-normType t = t
 
 testRCO :: CodaVal -> CodaVal
 testRCO = runRCO
@@ -302,9 +288,9 @@ isLit (Lit _) = return ()
 isLit v = showError "isLit" v
 
 isConvert :: RCOCheck
-isConvert c@(Convert v t) = case (v, t) of
-  (Var{}, BundleDic{}) -> return ()
-  _ -> showError "isConvert" c
+-- isConvert c@(Convert v t) = case (v, t) of
+--   (Var{}, BundleDic{}) -> return ()
+--   _ -> showError "isConvert" c
 isConvert c = showError "isConvert" c
 
 isLet :: RCOCheck

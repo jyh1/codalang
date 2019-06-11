@@ -56,34 +56,17 @@ data CodaVal = Lit UUID
 tmpName :: Text
 tmpName = "codalang"
 
-data TypeDict = TAll | TDict (Map Text CodaType)
+type TextMap = Map Text
+type TypeDict = TextMap CodaType
+data CodaType = TypeString | TypeBundle | TypeRecord TypeDict
     deriving (Eq, Ord, Read, Show)
-data CodaType = TypeString | BundleDic TypeDict
-    deriving (Eq, Ord, Read, Show)
-typeBundle :: CodaType
-typeBundle = BundleDic TAll
 
 isSubtypeOf :: CodaType -> CodaType -> Bool
-isSubtypeOf TypeString t = case t of
-    TypeString -> True
-    _ -> False
-isSubtypeOf (BundleDic d1) (BundleDic d2) = case (d1, d2) of
-    (_, TAll) -> True
-    (TAll, _) -> False
-    (TDict td1, TDict td2) -> M.null (M.differenceWith maybediff td2 td1)
-        where
-            maybediff t2 t1 = bool (Just t2) Nothing (t1 `isSubtypeOf` t2)
-isSubtypeOf _ _ = False
-    
--- allow TAll can be assigned to and from any bundle type
-canTakeValue :: CodaType -> CodaType -> Bool
-canTakeValue t1 t2
-    | t2 `isSubtypeOf` t1 = True
-    | otherwise = case (t1, t2) of
-        (BundleDic d1, BundleDic d2) -> case (d1, d2) of
-            (TAll, _) -> True
-            _ -> False
-        _ -> False
+isSubtypeOf (TypeRecord d1) (TypeRecord d2) = 
+    M.null (M.differenceWith maybediff d2 d1)
+    where
+        maybediff t2 t1 = bool (Just t2) Nothing (t1 `isSubtypeOf` t2)
+isSubtypeOf t1 t2 = t1 == t2
 
 data CodaResult = ResStr Text | ResBundle UUID
     deriving (Eq, Ord, Read, Show)
