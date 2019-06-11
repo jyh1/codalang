@@ -72,7 +72,7 @@ isSubtypeOf (BundleDic d1) (BundleDic d2) = case (d1, d2) of
     (TAll, _) -> False
     (TDict td1, TDict td2) -> M.null (M.differenceWith maybediff td2 td1)
         where
-            maybediff t2 t1 = bool Nothing (Just t2) (t1 `isSubtypeOf` t2)
+            maybediff t2 t1 = bool (Just t2) Nothing (t1 `isSubtypeOf` t2)
 isSubtypeOf _ _ = False
     
 -- allow TAll can be assigned to and from any bundle type
