@@ -61,17 +61,21 @@ toAnnoDocWithParen pval = case pval of
     Value{} -> toAnnoDoc pval
     _ -> parens (toAnnoDoc pval)
 
+dictAnno :: [(Doc ann, Doc ann)] -> Doc ann
+dictAnno ads = group (encloseSep (flatAlt "{ " "{") (flatAlt " }" "}") ", " dicLis)
+    where 
+        dicLis = [ sep [cat [k, ":"], v] | (k, v) <- ads]
+
 instance (Pretty CodaType) where
     pretty TypeString = "String"
-    pretty (BundleDic dic) = group (encloseSep (flatAlt "{ " "{") (flatAlt " }" "}") ", " dicLis)
-        where
-            dicLis = [ sep [cat [pretty k, ":"], pretty v] | (k, v) <- M.toList dic]
+    pretty (BundleDic d) = case d of
+        TAll -> "{_}"
+        TDict dict -> dictAnno [ (pretty k, pretty v) | (k, v) <- M.toList dict]
 
 instance CodaLangEnv PPPass PPrint where
     lit u = case u of
         UUID{} -> ranno LitAnno (pretty (show u))
         BundleName n -> foldCoda (Convert (Str n) typeBundle)
-    -- var :: VarName -> m a
     var vn = do
         c <- use (envL . at vn . to (fromMaybe errmsg))
         ranno (VarAnno vn c) (pretty vn)
@@ -103,6 +107,7 @@ instance CodaLangEnv PPPass PPrint where
             PTypeAnno d -> PLet [stmt] d
             PLet ss d -> PLet (stmt : ss) d
     convert val ct = return (PTypeAnno (annotate TypeAnno (fillCat [toAnnoDocWithParen val, " :: ", pretty ct])))
+    dict d = return (Value (dictAnno [ (pretty k, toAnnoDoc v) | (k, v) <- M.toList d]))
 
 codaToDoc :: CodaVal -> AnnoDoc
 codaToDoc cv = toAnnoDoc res
