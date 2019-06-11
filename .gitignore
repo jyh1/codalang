@@ -3,3 +3,5 @@
 *.swp
 tarballs/
 .stack-work/
+md5all.sh
+test.cl
