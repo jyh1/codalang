@@ -25,9 +25,9 @@ data CodaTestRes = BunRes UUID
     | RunRes Int 
     | DirRes CodaTestRes [Text] 
     | StrRes Text 
-    | VarRes Text 
     | CatRes Int
     | DictRes (Map Text CodaTestRes)
+    | MakeRes Int
     deriving (Show, Read, Eq, Ord)
 
 data CmdLog a = LogRun [a] | LogCat a
@@ -64,26 +64,37 @@ instance CodaLangEnv InterApp CodaTestRes where
     dir val sub = return $ case val of
         DictRes d -> fromMaybe keepDirRes (M.lookup sub d)
         DirRes v subs -> DirRes v (subs ++ [sub])
-        _ -> keepDirRes
+        _ -> DirRes val [sub]
         where
-            keepDirRes = DirRes val [sub]
+            keepDirRes = error "Undefined key in record"
     clet varn val body = do
         valres <- val
         withVar varn valres body
     convert val vt = makeConvert val vt
         where
+            makeConvert :: CodaTestRes -> CodaType -> InterApp CodaTestRes
             makeConvert val vt = case vt of
                 TypeString -> case val of
                     StrRes{} -> return val
                     CatRes{} -> return val
                     _ -> runCat val
-                -- BundleDic d -> case d of
-                --     TAll -> case val of
-                --         StrRes s -> return (BunRes (BundleName s))
-                --         CatRes i -> return (RunRes i)
-                --         _ -> return val
-                --     TDict td -> 
-                --         DictRes <$> sequence (M.mapWithKey (\k t -> dir val k >>= (`makeConvert` t)) td)
+                TypeBundle -> case val of
+                    StrRes s -> return (BunRes (BundleName s))
+                    CatRes i -> return (RunRes i)
+                    DictRes {} -> MakeRes <$> getCounter
+                    _ -> return val
+                TypeRecord d -> case val of
+                    DictRes vd -> DictRes <$> (sequence $
+                        M.fromList [(k, fromMaybe (return v) ((v `makeConvert`) <$> M.lookup k d)) | (k, v) <- M.toList vd])
+                    _ -> case hasTypeString vt of
+                            True -> DictRes <$> sequence (M.mapWithKey (\k t -> dir val k >>= (`makeConvert` t)) d)
+                            _ -> return val
+                    where
+                        hasTypeString :: CodaType -> Bool
+                        hasTypeString t = case t of
+                            TypeString -> True
+                            TypeBundle -> False
+                            TypeRecord d -> anyOf traverse hasTypeString d
     dict = return . DictRes
 
 

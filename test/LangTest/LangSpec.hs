@@ -82,18 +82,18 @@ pprintSpec = describe "pretty-printer test" $ do
     testPrinter "default width" testPPrintShow
     testPrinter "compact" testPPrintCompact
     -- codaval -> typecheck -> RCO -> pprint -> parse -> RCO -> interpret (should produce same results)
-    let doParse = fromJust . testParse
-        pipelined ast = testRCO (doParse (testPPrint ast))
-    it "same results after parse back from RCO" $ property $
-        (\(RandCodaRCO old cv) -> dummyInterpret (pipelined cv) == dummyInterpret old)
+    -- let doParse = fromJust . testParse
+    --     pipelined ast = testRCO (doParse (testPPrint ast))
+    -- it "same results after parse back from RCO" $ property $
+    --     (\(RandCodaRCO old cv) -> dummyInterpret (pipelined cv) == dummyInterpret old)
                     
 
 typeCheckSpec :: Spec
 typeCheckSpec = describe "type-checker test" $ do
     it "pass type check in random generated ast" $ property $
         (\(RandCoda ct cv) -> (testTypeCheck cv) `typeCompat` ct)
-    -- it "same results of new AST" $ property $
-    --     (\(RandCoda _ cv) -> (dummyInterpret (testTypeCheckVal cv)) == dummyInterpret cv)
+    it "same results of new AST" $ property $
+        (\(RandCoda _ cv) -> (dummyInterpret (testTypeCheckVal cv)) == dummyInterpret cv)
 
 rcoSpec :: Spec
 rcoSpec = describe "RCO(remove_complex_operation)" $ do
