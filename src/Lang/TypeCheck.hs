@@ -80,9 +80,13 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
     str k = return (makeRes TypeString (Str k))
     cl (Run es) = do
         es' <- sequence es
+        mapM_ notRecord es'
         return (makeRun <$> (coSequenceT TypeBundle es'))
         where
             makeRun = Cl . Run
+            notRecord t = case resType t of
+                ty@TypeRecord{} -> throwErr (TypeError (Mismatch TypeBundle ty) (resOrig t))
+                _ -> return ()
     cl (ClCat _) = error "Cat command during type check"
     dir val sub = case resType val of
         TypeString -> throwErr (TypeError (Mismatch TypeBundle TypeString) ast)
@@ -97,7 +101,17 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         valRes <- val
         bodyRes <- withVar vn (resType valRes) body
         return (liftRes2 (Let vn) valRes bodyRes)
-    convert val vt = return (fmapT vt (`Convert` vt) val)
+    -- convert val vt = return (fmapT vt (`Convert` vt) val)
+    convert val vt 
+        | ty `isSubtypeOf` vt = return val
+        | otherwise = case (ty, vt) of
+            (TypeRecord{}, TypeString) -> fail
+            (TypeString, TypeRecord{}) -> fail
+            _ -> return (fmapT vt (`Convert` vt) val)
+        where
+            ty = resType val
+            ast = resOrig val
+            fail = throwErr (TypeError (TypeCastError ty vt) ast) 
     dict d = do
         let td = resType <$> d
             tv = resVal <$> d
