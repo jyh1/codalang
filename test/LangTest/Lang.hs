@@ -139,12 +139,12 @@ randLet t = do
 
 randConvert :: CodaType -> GenEnv CodaVal
 randConvert t = do
-  let genType = case t of
-        TypeRecord d -> oneof [pure TypeBundle, TypeRecord <$> extendDic, pure t]
+  let genType = extendType t
           where
-            extendDic = (d `M.union`) <$> randTypeDic
-        TypeString -> oneof [pure TypeBundle, pure TypeString]
-        _ -> randType
+            extendType t = case t of
+              TypeString -> elements [TypeString, TypeBundle]
+              TypeBundle -> randType
+              TypeRecord d -> oneof [pure TypeBundle, TypeRecord <$> liftA2 M.union (mapM extendType d) randTypeDic]
   newt <- lift genType
   val <- decDepth (randTree newt)
   return (Convert val t)

@@ -90,10 +90,19 @@ pprintSpec = describe "pretty-printer test" $ do
 
 typeCheckSpec :: Spec
 typeCheckSpec = describe "type-checker test" $ do
-    it "pass type check in random generated ast" $ property $
-        (\(RandCoda ct cv) -> (testTypeCheck cv) `typeCompat` ct)
-    it "same results of new AST" $ property $
-        (\(RandCoda _ cv) -> (dummyInterpret (testTypeCheckVal cv)) == dummyInterpret cv)
+    -- it "pass type check in random generated ast" $ property $
+    --     (\(RandCoda ct cv) -> (testTypeCheck cv) `typeCompat` ct)
+    it "remove unnecesary type casting" $ do
+        let cvr = cv (l "2") 
+            r1 = bd [("x", abd)]
+            r2 = bd [("x", abd), ("y", abd)]
+            r3 = bd [("x", abd), ("y", ts)]
+        testTypeCheckVal (cv (cvr r1) abd) `shouldBe` l "2"
+        testTypeCheckVal (cv (cvr r2) r1) `shouldBe` l "2"
+        testTypeCheckVal (cv (cvr r3) r1) `shouldBe` cvr r3
+        testTypeCheckVal (cv (cvr r3) abd) `shouldBe` cv (cvr r3) abd
+    -- it "same results of new AST" $ property $
+    --     (\(RandCoda _ cv) -> (dummyInterpret (testTypeCheckVal cv)) == dummyInterpret cv)
 
 rcoSpec :: Spec
 rcoSpec = describe "RCO(remove_complex_operation)" $ do
