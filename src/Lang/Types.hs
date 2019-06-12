@@ -61,12 +61,23 @@ data CodaType = TypeString | TypeBundle | TypeRecord TypeDict
     deriving (Eq, Ord, Read, Show)
 
 isSubtypeOf :: CodaType -> CodaType -> Bool
-isSubtypeOf (TypeRecord d1) (TypeRecord d2) = 
-    M.null (M.differenceWith maybediff d2 d1)
-    where
-        maybediff t2 t1 = bool (Just t2) Nothing (t1 `isSubtypeOf` t2)
+isSubtypeOf (TypeRecord d1) (TypeRecord d2) = dictMinus isSubtypeOf d2 d1
 isSubtypeOf TypeBundle (TypeRecord d1) = allOf traverse (TypeBundle `isSubtypeOf`) d1
 isSubtypeOf t1 t2 = t1 == t2
+
+convertable :: CodaType -> CodaType -> Bool
+convertable t1 t2
+    | t1 `isSubtypeOf` t2 = True
+    | otherwise = case (t1, t2) of
+        (TypeRecord{}, TypeString) -> False
+        (TypeString, TypeRecord{}) -> False
+        (TypeRecord d1, TypeRecord d2) -> dictMinus convertable d2 d1
+        _ -> True
+
+dictMinus :: (CodaType -> CodaType -> Bool) -> TypeDict -> TypeDict -> Bool
+dictMinus f d1 d2 = M.null (M.differenceWith maybediff d1 d2)
+    where
+        maybediff t2 t1 = bool (Just t2) Nothing (f t1 t2)
 
 data CodaResult = ResStr Text | ResBundle UUID
     deriving (Eq, Ord, Read, Show)
