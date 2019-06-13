@@ -95,7 +95,7 @@ instance CodaLangEnv InterApp CodaTestRes where
                             TypeString -> True
                             TypeBundle -> False
                             TypeRecord d -> anyOf traverse hasTypeString d
-    dict = return . DictRes
+    dict dm = DictRes <$> (sequence dm)
 
 
 runCat :: CodaTestRes -> InterApp CodaTestRes

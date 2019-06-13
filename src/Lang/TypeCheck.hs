@@ -127,7 +127,8 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
             deepConvert = return shadowConvert{underlineType = vt}
             isSub = ty `isSubtypeOf` vt
             isConvertable = ty `convertable` vt
-    dict d = do
+    dict dm = do
+        d <- sequence dm
         let td = resType <$> d
             tv = resVal <$> d
             torig = resOrig <$> d
