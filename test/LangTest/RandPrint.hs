@@ -135,7 +135,7 @@ rendCoda cv = case cv of
             rendRs = rendCoda <$> rs
             rendLis = insertComma sep rendRs
             sep = spaceSymbol ","
-    Cl (ClCat val) -> rendCoda (Convert val TypeString)
+    Cl (ClCat val) -> rendCoda (defConvert val TypeString)
     Str s -> entity (RStr s)
     Dir b ps -> entity (RLis [rendB, dirSep, rendP])
         where
@@ -151,7 +151,7 @@ rendCoda cv = case cv of
                 in
                     over _1 (enwAs:) (getLetLis body1)
             getLetLis other = ([], rendCoda other)
-    Convert val ct -> entity (doubleColon rendVal (RType ct))
+    Convert _ val ct -> entity (doubleColon rendVal (RType ct))
         where
             rendVal = case val of
                 Let{} -> Parens1 (rendCoda val)

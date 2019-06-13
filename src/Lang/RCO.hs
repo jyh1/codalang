@@ -10,13 +10,14 @@ module Lang.RCO
     )
 where
 -- remove complex operations
-    -- bundle := Var var | dirRCO
+    -- bundle := var | dirRCO
+    -- record := {text : value}
     -- str := string | var
-    -- value := bundle | str
+    -- value := bundle | str | var
     -- cmdRCO := Cmd value
     -- dirRCO := Dir bundle text
-    -- convert := Convert (var) BundleDic
-    -- letRCO := Let var (cmdRCO | dirRCO | lit | str | convert) rco
+    -- convert := Convert (var) TypeBundle
+    -- letRCO := Let var (cmdRCO | dirRCO | lit | str | convert | record) rco
     -- rco := value | letRCO
 
 import           Control.Monad.State            ( StateT
@@ -77,6 +78,7 @@ data RCOVal = RCOLit UUID
     | RCOCmd CmdRCO 
     | RCODir VarName Path 
     | RCOStr Text
+    | RCORec (TextMap Value)
 data RCO a = RCO NameBindings a
     deriving (Show, Eq, Read, Functor)
 instance (Applicative RCO) where
@@ -115,6 +117,7 @@ toVarName (RCOStr t) = bindName (Str t)
 toVarName (RCOVar varn         ) = return varn
 toVarName (RCOCmd cmd          ) = bindName (Cl cmd)
 toVarName (RCODir bname subdirs) = bindName (fromRCODir bname subdirs)
+toVarName (RCORec m) = bindName (Dict m)
 
 toValue :: RCOVal -> RCOPass Value
 toValue (RCODir bname subdirs) = return $ case subdirs of
@@ -146,21 +149,24 @@ instance CodaLangEnv RCOPass RCORes where
                 )
     cl (Run cmd) = RCOCmd <$> rcocmd
         where rcocmd = Run <$> traverse (>>= toValue) cmd
-    cl (ClCat bud) = error "Unexpected cat command in RCO"
+    cl (ClCat _) = error "Unexpected cat command in RCO"
     dir val subdir = do
         (newn, path) <- toSubDir val
         return (RCODir newn (path S.|> subdir))
     clet vname val body = do
         newns <- withLocal vname (val >>= toVarName)
         withVar vname newns body
-    convert val t = do
+    convert _ val t = do
         cval <- toValue val
-        let conv = RCOVar <$> bindName (Convert cval t)
+        let conv = RCOVar <$> bindName (Convert Nothing cval t)
             catCmd = return (RCOCmd (ClCat cval))
         case (cval, t) of
             (Lit{}, TypeString) -> catCmd
             (Var{}, TypeString) -> catCmd
-            (Var{}, TypeRecord{}) -> conv
+            (Var{}, TypeBundle) -> conv
             (Dir{}, TypeString) -> catCmd
-            (Str s, TypeRecord{}) -> return (RCOLit (BundleName s))
+            (Str s, TypeBundle) -> return (RCOLit (BundleName s))
+            -- record
             _ -> error "errors in RCO convert"
+    dict rs =
+        RCORec <$> traverse (>>= toValue) rs

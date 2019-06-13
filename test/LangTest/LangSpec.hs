@@ -99,8 +99,9 @@ typeCheckSpec = describe "type-checker test" $ do
             r3 = bd [("x", abd), ("y", ts)]
         testTypeCheckVal (cv (cvr r1) abd) `shouldBe` l "2"
         testTypeCheckVal (cv (cvr r2) r1) `shouldBe` l "2"
-        testTypeCheckVal (cv (cvr r3) r1) `shouldBe` cvr r3
-        testTypeCheckVal (cv (cvr r3) abd) `shouldBe` cv (cvr r3) abd
+        let convAbd = conv (Just abd) (l "2")
+        testTypeCheckVal (cv (cvr r3) r1) `shouldBe` convAbd r3
+        testTypeCheckVal (cv (cvr r3) abd) `shouldBe` conv (Just r3) (convAbd r3) abd
     it "same results of new AST" $ property $
         (\(RandCoda _ cv) -> (dummyInterpret (testTypeCheckVal cv)) == dummyInterpret cv)
 

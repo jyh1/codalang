@@ -48,7 +48,7 @@ fromParseRes res = case res of
     PDir home subs -> foldl' Dir (fromParseRes home) subs
     PConv val ts -> case ts of
         [] -> fromParseRes val
-        _ -> foldl' Convert (fromParseRes val) ts
+        _ -> foldl' defConvert (fromParseRes val) ts
     PDict d -> Dict (fromParseRes <$> d)
 
 optionalFollowed :: (a -> b -> a) -> a -> Maybe b -> a

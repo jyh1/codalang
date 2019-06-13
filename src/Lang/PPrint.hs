@@ -74,7 +74,7 @@ instance (Pretty CodaType) where
 instance CodaLangEnv PPPass PPrint where
     lit u = case u of
         UUID{} -> ranno LitAnno (pretty (show u))
-        BundleName n -> foldCoda (Convert (Str n) TypeBundle)
+        BundleName n -> foldCoda (defConvert (Str n) TypeBundle)
     var vn = do
         c <- use (envL . at vn . to (fromMaybe errmsg))
         ranno (VarAnno vn c) (pretty vn)
@@ -93,7 +93,7 @@ instance CodaLangEnv PPPass PPrint where
                 [e] -> lpr <> e <> comma <> rpr
                 _ -> cat (zipWith (<>) (lpr : repeat s) cs') <> rpr
         ranno RunAnno (group runeles)
-    cl (ClCat val) = val >>= (`convert` TypeString)
+    cl (ClCat val) = val >>= (\v -> convert Nothing v TypeString)
     dir bval sub = 
         ranno DirAnno (toAnnoDocWithParen bval <> "/" <> pretty sub)
     clet vn val body = do
@@ -105,7 +105,7 @@ instance CodaLangEnv PPPass PPrint where
             Value d -> PLet [stmt] d
             PTypeAnno d -> PLet [stmt] d
             PLet ss d -> PLet (stmt : ss) d
-    convert val ct = return (PTypeAnno (annotate TypeAnno (fillCat [toAnnoDocWithParen val, " :: ", pretty ct])))
+    convert _ val ct = return (PTypeAnno (annotate TypeAnno (fillCat [toAnnoDocWithParen val, " :: ", pretty ct])))
     dict d = do
         dres <- sequence d
         return (Value (dictAnno [ (pretty k, toAnnoDoc v) | (k, v) <- M.toList dres]))

@@ -147,7 +147,7 @@ randConvert t = do
               TypeRecord d -> oneof [pure TypeBundle, TypeRecord <$> liftA2 M.union (mapM extendType d) randTypeDic]
   newt <- lift genType
   val <- decDepth (randTree newt)
-  return (Convert val t)
+  return (defConvert val t)
 
 randValDict :: TypeDict -> GenEnv CodaVal
 randValDict d = 
@@ -254,7 +254,8 @@ tmpNV :: Int -> CodaVal
 tmpNV = Var . tmpN
 bd = TypeRecord . M.fromList
 abd = TypeBundle
-cv = Convert
+cv = Convert Nothing
+conv = Convert
 ts = TypeString
 emptBd = TypeRecord mempty
 dict = Dict . M.fromList

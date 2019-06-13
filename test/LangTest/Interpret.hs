@@ -70,7 +70,7 @@ instance CodaLangEnv InterApp CodaTestRes where
     clet varn val body = do
         valres <- val
         withVar varn valres body
-    convert val vt = makeConvert val vt
+    convert _ val vt = makeConvert val vt
         where
             makeConvert :: CodaTestRes -> CodaType -> InterApp CodaTestRes
             makeConvert val vt = case vt of

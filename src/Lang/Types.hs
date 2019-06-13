@@ -48,9 +48,13 @@ data CodaVal = Lit UUID
     | Str Text
     | Dir CodaVal Text
     | Let VarName CodaVal CodaVal
-    | Convert CodaVal CodaType
+    -- value targettype fromtype
+    | Convert (Maybe CodaType) CodaVal CodaType
     | Dict (Map Text CodaVal)
     deriving (Eq, Ord, Read, Show)
+
+defConvert :: CodaVal -> CodaType -> CodaVal
+defConvert = Convert Nothing
 
 tmpName :: Text
 tmpName = "codalang"

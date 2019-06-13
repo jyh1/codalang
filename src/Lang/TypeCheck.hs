@@ -106,8 +106,7 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         valRes <- val
         bodyRes <- withVar vn (Var vn <$ valRes) body
         return (liftRes2 (Let vn) valRes bodyRes)
-    -- convert val vt = return (fmapT vt (`Convert` vt) val)
-    convert val vt 
+    convert _ val vt 
         | isSub = rmConvert
         | otherwise = case (ty, vt) of
             (TypeRecord{}, TypeString) -> castErr
@@ -123,7 +122,7 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
             ast = resOrig val
             castErr = throwErr (TypeError (TypeCastError ty vt) ast)
             rmConvert = return (val {resType = vt})
-            shadowConvert = fmapT vt (`Convert` vt) val
+            shadowConvert = fmapT vt (\v -> Convert (Just ty) v vt) val
             deepConvert = return shadowConvert{underlineType = vt}
             isSub = ty `isSubtypeOf` vt
             isConvertable = ty `convertable` vt
