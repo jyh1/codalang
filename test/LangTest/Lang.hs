@@ -8,7 +8,7 @@
 
 module LangTest.Lang where
 
-import LangTest.Interpret (testInterpret, testInterpretWIntrfc)
+import LangTest.Interpret
 import LangTest.RandPrint (randomPrintCoda)
 
 import Lang.Types
@@ -128,7 +128,7 @@ randCl = Cl <$> randCmd
       return (Run geneles)
       where
         pickType = lift (elements [TypeBundle, TypeString])
-        reduceDepth = decDepth : repeat halfDepth
+        reduceDepth = decDepth : decDepth : repeat halfDepth
 
 randLet :: CodaType -> GenEnv CodaVal
 randLet t = do
@@ -168,9 +168,12 @@ randTree t = do
     -- non leaf bundle type
     randRecord :: TypeDict -> GenEnv CodaVal
     randRecord dic = 
-      oneofGenEnv [randValDict dic, randDir t, randLet t, randConvert t]
+      oneofGenEnv ([randDir t, randLet t, randConvert t] ++ genValDic)
       where
         t = TypeRecord dic
+        genValDic
+          | M.null dic = []
+          | otherwise = [randValDict dic]
     randBundle = oneofGenEnv [randCl, randDir t, randLet t, randConvert t]
     -- non leaf string
     randString :: GenEnv CodaVal
@@ -178,7 +181,7 @@ randTree t = do
 
 
 randType :: Gen CodaType
-randType = oneof [pure TypeString, pure TypeBundle, TypeRecord <$> randTypeDic]
+randType = frequency [(3, pure TypeString), (3, pure TypeBundle), (2, TypeRecord <$> randTypeDic)]
 randDicKey = frequency ((1, randVarName) : [(2, pure ("key" <> tshow i)) | i <- [1..3]])
 randDicEle = liftA2 (curry id) randDicKey randType
 randTypeDic = M.fromList <$> (resize 3 (listOf randDicEle))
@@ -295,14 +298,24 @@ isLit (Lit _) = return ()
 isLit v = showError "isLit" v
 
 isConvert :: RCOCheck
--- isConvert c@(Convert v t) = case (v, t) of
---   (Var{}, BundleDic{}) -> return ()
---   _ -> showError "isConvert" c
-isConvert c = showError "isConvert" c
+isConvert c@(Convert f v t) = case (f, t) of
+  (Just TypeString, TypeBundle) -> msum [isStr v, isVar v, isDir v, err]
+  (Just TypeRecord{}, TypeBundle) -> msum [isVar v, err]
+  _ -> isVar v
+  where
+    err = showError "isConvert" c
+-- isConvert c = showError "isConvert" c
+isConvert c
+  -- | trace (T.pack $ testPPrint c) False = return ()
+  | True = showError "isConvert" c
 
 isLet :: RCOCheck
-isLet (Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert]), isRCO body]
+isLet c@(Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert, isRecord, const (showError "isLet" c)]), isRCO body]
 isLet v = showError "isLet" v
+
+isRecord :: RCOCheck
+isRecord (Dict d) = mapM_ isValue d
+isRecord v = showError "isRecord" v
 
 isRCO :: RCOCheck
 isRCO v = isValue v `mplus` isLet v
@@ -314,6 +327,16 @@ checkRCO v = case isRCO v of
 
 dummyInterpret = testInterpret
 dummyInterpretWIntfrc = testInterpretWIntrfc
+
+checkInterpretRes ::  ([CmdLog CodaTestRes], CodaTestRes) ->  ([CmdLog CodaTestRes], CodaTestRes) -> Bool
+checkInterpretRes (l1s, r1) (l2s, r2) = 
+  l1s == l2s && checkRes r1 r2
+  where
+    checkRes (DictRes d1) (DictRes d2) = 
+      dictMinus (flip checkRes) d1 d2
+    checkRes (DictRes d1) newval =
+      and [checkRes v (makeDir newval k) |(k, v) <- M.toList d1]
+    checkRes res1 res2 = res1 == res2
 
 testParse :: String -> Maybe CodaVal
 testParse = loadString

@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module LangTest.Interpret(testInterpret, testInterpretWIntrfc) where
+module LangTest.Interpret(testInterpret, testInterpretWIntrfc, CodaTestRes(..), CmdLog, makeDir) where
 
 -- a dummy interpreter for CodaVal for testing purpose
 
@@ -30,7 +30,7 @@ data CodaTestRes = BunRes UUID
     | MakeRes Int
     deriving (Show, Read, Eq, Ord)
 
-data CmdLog a = LogRun [a] | LogCat a
+data CmdLog a = LogRun [a] | LogCat a | LogMake [(Text, a)]
     deriving (Show, Read, Eq, Ord)
 
 data CodaInterEnv a = CodaInterEnv {_envmap :: VarMap a, _cmdlog :: [CmdLog a], _counter :: Int}
@@ -61,16 +61,11 @@ instance CodaLangEnv InterApp CodaTestRes where
                 cmdlog %= (LogRun cmd' :)
                 RunRes <$> getCounter
             ClCat val -> runCat val
-    dir val sub = return $ case val of
-        DictRes d -> fromMaybe keepDirRes (M.lookup sub d)
-        DirRes v subs -> DirRes v (subs ++ [sub])
-        _ -> DirRes val [sub]
-        where
-            keepDirRes = error "Undefined key in record"
+    dir val sub = return $ makeDir val sub
     clet varn val body = do
         valres <- val
         withVar varn valres body
-    convert _ val vt = makeConvert val vt
+    convert tt val vt = makeConvert val vt
         where
             makeConvert :: CodaTestRes -> CodaType -> InterApp CodaTestRes
             makeConvert val vt = case vt of
@@ -81,22 +76,38 @@ instance CodaLangEnv InterApp CodaTestRes where
                 TypeBundle -> case val of
                     StrRes s -> return (BunRes (BundleName s))
                     CatRes i -> return (RunRes i)
-                    DictRes {} -> MakeRes <$> getCounter
+                    DictRes dict -> do
+                        resD <- mapM (`makeConvert` TypeBundle) dict
+                        cmdlog %= (LogMake (M.toList resD) :)
+                        MakeRes <$> getCounter
                     _ -> return val
                 TypeRecord d -> case val of
                     DictRes vd -> DictRes <$> (sequence $
-                        M.fromList [(k, fromMaybe (return v) ((v `makeConvert`) <$> M.lookup k d)) | (k, v) <- M.toList vd])
-                    _ -> case hasTypeString vt of
-                            True -> DictRes <$> sequence (M.mapWithKey (\k t -> dir val k >>= (`makeConvert` t)) d)
-                            _ -> return val
+                        M.intersectionWith (\v t -> makeConvert v t) vd d)
+                    _ -> DictRes <$> sequence (M.mapWithKey (\k t -> dir val k >>= (`makeConvert` t)) d)
                     where
                         hasTypeString :: CodaType -> Bool
                         hasTypeString t = case t of
                             TypeString -> True
                             TypeBundle -> False
                             TypeRecord d -> anyOf traverse hasTypeString d
+            -- softConvert :: CodaTestRes -> CodaType -> CodaTestRes
+            -- softConvert res ty = case ty of
+            --     TypeString -> res
+            --     TypeBundle -> res
+            --     TypeRecord dt -> case res of
+            --         DictRes dr -> DictRes (M.intersectionWith softConvert dr dt)
+            --         _ -> DictRes (M.mapWithKey (\k ty -> softConvert (makeDir res k) ty) dt)
     dict dm = DictRes <$> (sequence dm)
 
+makeDir :: CodaTestRes -> Text -> CodaTestRes
+makeDir val sub =
+    case val of
+        DictRes d -> fromMaybe keepDirRes (M.lookup sub d)
+        DirRes v subs -> DirRes v (subs ++ [sub])
+        _ -> DirRes val [sub]
+        where
+            keepDirRes = error "Undefined key in record"
 
 runCat :: CodaTestRes -> InterApp CodaTestRes
 runCat val = do

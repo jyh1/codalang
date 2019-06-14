@@ -11,6 +11,9 @@ import RIO.Partial
 import LangTest.Lang
 import qualified RIO.Text as T
 
+import RIO.Map (fromList)
+import Prelude (putStrLn)
+import Lang.Types
 
 langSpec :: Spec
 langSpec = do
@@ -72,6 +75,8 @@ parserQuickCheck = describe "parser_quick_check" $
     it "parse back from randomly printed string" $ property $
         quickCheckWith stdArgs{ maxSuccess = 300 } (\(ParserTest cv cvStr) -> testParse cvStr == (Just cv))
 
+pprintC = putStrLn . testPPrint
+randomPrint = generate arbitrary >>= (\(RandCoda _ cv) -> pprintC cv)
 -- pprint should be parsed back to the same AST
 pprintSpec :: Spec
 pprintSpec = describe "pretty-printer test" $ do
@@ -92,18 +97,8 @@ typeCheckSpec :: Spec
 typeCheckSpec = describe "type-checker test" $ do
     it "pass type check in random generated ast" $ property $
         (\(RandCoda ct cv) -> (testTypeCheck cv) `typeCompat` ct)
-    it "remove unnecesary type casting" $ do
-        let cvr = cv (l "2") 
-            r1 = bd [("x", abd)]
-            r2 = bd [("x", abd), ("y", abd)]
-            r3 = bd [("x", abd), ("y", ts)]
-        testTypeCheckVal (cv (cvr r1) abd) `shouldBe` l "2"
-        testTypeCheckVal (cv (cvr r2) r1) `shouldBe` l "2"
-        let convAbd = conv (Just abd) (l "2")
-        testTypeCheckVal (cv (cvr r3) r1) `shouldBe` convAbd r3
-        testTypeCheckVal (cv (cvr r3) abd) `shouldBe` conv (Just r3) (convAbd r3) abd
     it "same results of new AST" $ property $
-        (\(RandCoda _ cv) -> (dummyInterpret (testTypeCheckVal cv)) == dummyInterpret cv)
+        (\(RandCoda _ cv) -> checkInterpretRes (dummyInterpret cv) (dummyInterpret (testTypeCheckVal cv)))
 
 rcoSpec :: Spec
 rcoSpec = describe "RCO(remove_complex_operation)" $ do
@@ -131,7 +126,7 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
     it "random_gen_RCO" $ property
         (\(RandCodaRCO _ cv) -> checkRCO cv)
     it "same_result_after_RCO" $ property
-        (\(RandCodaRCO old cv) -> dummyInterpret old == dummyInterpret cv)
+        (\(RandCodaRCO old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret cv))
 
 interpretInterface :: Spec
 interpretInterface = do
