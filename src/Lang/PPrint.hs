@@ -48,7 +48,7 @@ ranno a d = return (anno a d)
 toAnnoDoc :: PPrint -> AnnoDoc
 toAnnoDoc (Value d) = d
 toAnnoDoc (PTypeAnno d) = d
-toAnnoDoc (PLet as body) = annotate LetAnno (hang 3 (sep [defs, body]))
+toAnnoDoc (PLet as body) = annotate LetAnno (hang 4 (sep [defs, body]))
     where
         keyword = annotate Keyword
         keylet = keyword "let"
@@ -62,9 +62,10 @@ toAnnoDocWithParen pval = case pval of
     _ -> parens (toAnnoDoc pval)
 
 dictAnno :: [(Doc ann, Doc ann)] -> Doc ann
-dictAnno ads = group (encloseSep (flatAlt "{ " "{") (flatAlt " }" "}") ", " dicLis)
+-- dictAnno ads = group (align $ encloseSep (flatAlt ("{" <> line) "{") (flatAlt (line <> "}") "}") ", " dicLis)
+dictAnno ads = group (align $ encloseSep (flatAlt ("{" <> line <> "  ") "{") (flatAlt (line <> "}") "}") ", " dicLis)
     where 
-        dicLis = [ sep [cat [k, ":"], v] | (k, v) <- ads]
+        dicLis = [hang 4 (k <> ":" <+> v) | (k, v) <- ads]
 
 instance (Pretty CodaType) where
     pretty TypeString = "String"
@@ -85,10 +86,10 @@ instance CodaLangEnv PPPass PPrint where
     cl (Run cmd) = do
         cs <- sequence cmd
         let cs' = toAnnoDoc <$> cs
-            lpr = flatAlt "( " "("
-            rpr = (flatAlt " )" ")")
+            lpr = flatAlt ("(" <> line <> "  ") "("
+            rpr = (flatAlt (line <> ")") ")")
             s = ", "
-            runeles = case cs' of
+            runeles = align $ case cs' of
                 [] -> error "PPrint: empty run command"
                 [e] -> lpr <> e <> comma <> rpr
                 _ -> cat (zipWith (<>) (lpr : repeat s) cs') <> rpr
@@ -105,7 +106,7 @@ instance CodaLangEnv PPPass PPrint where
             Value d -> PLet [stmt] d
             PTypeAnno d -> PLet [stmt] d
             PLet ss d -> PLet (stmt : ss) d
-    convert _ val ct = return (PTypeAnno (annotate TypeAnno (fillCat [toAnnoDocWithParen val, " :: ", pretty ct])))
+    convert _ val ct = return (PTypeAnno (annotate TypeAnno (align (toAnnoDocWithParen val <+> "::" <+> pretty ct))))
     dict d = do
         dres <- sequence d
         return (Value (dictAnno [ (pretty k, toAnnoDoc v) | (k, v) <- M.toList dres]))
