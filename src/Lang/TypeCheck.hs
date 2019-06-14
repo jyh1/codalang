@@ -52,17 +52,17 @@ instance Show TypeError where
 
 type TCState = Map VarName (TCRes CodaVal)
 type TCPass = StateT TCState (Either TypeError)
-data TCRes a = TCRes {resType :: CodaType, underlineType :: CodaType, resVal :: a, resOrig :: a}
+data TCRes a = TCRes {resType :: CodaType, resVal :: a, resOrig :: a}
     deriving (Show, Read, Eq, Functor)
 fmapT :: CodaType -> (a -> b) -> TCRes a -> TCRes b
 fmapT t f res = (fmap f res){resType = t}
 liftRes2 :: (a -> b -> c) -> TCRes a -> TCRes b -> TCRes c
-liftRes2 f (TCRes _ _ v1 o1) (TCRes t2 ot2 v2 o2) = TCRes t2 ot2 (f v1 v2) (f o1 o2)
+liftRes2 f (TCRes _ v1 o1) (TCRes t2 v2 o2) = TCRes t2 (f v1 v2) (f o1 o2)
 coSequenceT :: CodaType -> [TCRes a] -> TCRes [a]
-coSequenceT t as = TCRes {resType = t, underlineType = t, resVal = resVal <$> as, resOrig = resOrig <$> as}
+coSequenceT t as = TCRes {resType = t, resVal = resVal <$> as, resOrig = resOrig <$> as}
 
 makeRes :: CodaType -> CodaVal -> (TCRes CodaVal)
-makeRes t v = TCRes t t v v
+makeRes t v = TCRes t v v
 
 instance LocalVar TCState TCPass (TCRes CodaVal)
 
@@ -91,40 +91,27 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         TypeString -> throwErr (TypeError (Mismatch TypeBundle TypeString) ast)
         TypeBundle -> return (tagType TypeBundle)
         TypeRecord dic -> do
-            let dicEle = (return . recordType) <$> M.lookup sub dic
+            let dicEle = (return . tagType) <$> M.lookup sub dic
             fromMaybe (throwErr (TypeError (KeyError sub) ast)) dicEle
         where
             ast = resOrig val
             tagType t = fmapT t (`Dir` sub) val
-            recordType t = case underlineType val of
-                TypeBundle -> tagged
-                TypeRecord{} -> tagged{underlineType = resType tagged}
-                _ -> error "Impossible underline type"
-                where
-                    tagged = tagType t
     clet vn val body = do
         valRes <- val
         bodyRes <- withVar vn (Var vn <$ valRes) body
         return (liftRes2 (Let vn) valRes bodyRes)
     convert _ val vt 
-        | isSub = rmConvert
-        | otherwise = case (ty, vt) of
+        = case (ty, vt) of
             (TypeRecord{}, TypeString) -> castErr
             (TypeString, TypeRecord{}) -> castErr
-            (TypeRecord{}, TypeBundle) -> case unTy of
-                TypeBundle -> rmConvert
-                _ -> deepConvert
-            (TypeRecord {}, TypeRecord {}) -> bool castErr deepConvert isConvertable
-            _ -> deepConvert
+            (TypeRecord{}, TypeBundle) -> doConvert
+            (TypeRecord {}, TypeRecord {}) -> bool castErr doConvert isConvertable
+            _ -> doConvert
         where
             ty = resType val
-            unTy = underlineType val
             ast = resOrig val
             castErr = throwErr (TypeError (TypeCastError ty vt) ast)
-            rmConvert = return (val {resType = vt})
-            shadowConvert = fmapT vt (\v -> Convert (Just ty) v vt) val
-            deepConvert = return shadowConvert{underlineType = vt}
-            isSub = ty `isSubtypeOf` vt
+            doConvert = return $ fmapT vt (\v -> Convert (Just ty) v vt) val
             isConvertable = ty `convertable` vt
     dict dm = do
         d <- sequence dm
@@ -132,7 +119,7 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
             tv = resVal <$> d
             torig = resOrig <$> d
             ty = TypeRecord td
-        return (TCRes {resType = ty, underlineType = ty, resVal = Dict tv, resOrig = Dict torig})
+        return (TCRes {resType = ty, resVal = Dict tv, resOrig = Dict torig})
 
 typeCheck :: CodaVal -> Either Text (CodaType, CodaVal)
 typeCheck cv = case res of
