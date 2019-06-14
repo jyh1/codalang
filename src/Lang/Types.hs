@@ -78,7 +78,7 @@ convertable t1 t2
         (TypeRecord d1, TypeRecord d2) -> dictMinus convertable d2 d1
         _ -> True
 
-dictMinus :: (CodaType -> CodaType -> Bool) -> TypeDict -> TypeDict -> Bool
+dictMinus :: (a -> a -> Bool) -> TextMap a -> TextMap a -> Bool
 dictMinus f d1 d2 = M.null (M.differenceWith maybediff d1 d2)
     where
         maybediff t2 t1 = bool (Just t2) Nothing (f t1 t2)

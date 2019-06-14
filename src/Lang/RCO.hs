@@ -16,7 +16,7 @@ where
     -- value := bundle | str | var
     -- cmdRCO := Cmd value
     -- dirRCO := Dir bundle text
-    -- convert := Convert (var) TypeBundle
+    -- convert := Convert _ (value) TypeBundle
     -- letRCO := Let var (cmdRCO | dirRCO | lit | str | convert | record) rco
     -- rco := value | letRCO
 
@@ -27,6 +27,7 @@ import           RIO                     hiding ( to )
 import           Control.Lens
 import qualified RIO.Text                      as T
 import qualified RIO.Seq                       as S
+import qualified RIO.Map                       as M
 import           RIO.List                       ( foldl )
 
 import           Lang.Types
@@ -104,9 +105,11 @@ newTmpName = do
     getName cs      = toList cs
 
 bindName :: LetRhs -> RCOPass VarName
-bindName cv = do
-    name <- newTmpName
-    lift (RCO (S.singleton (name, cv)) name)
+bindName cv = case cv of
+    Var v -> return v
+    _ -> do
+        name <- newTmpName
+        lift (RCO (S.singleton (name, cv)) name)
 
 fromRCODir :: VarName -> Path -> Bundle
 fromRCODir n path = foldl Dir (Var n) path
@@ -156,17 +159,46 @@ instance CodaLangEnv RCOPass RCORes where
     clet vname val body = do
         newns <- withLocal vname (val >>= toVarName)
         withVar vname newns body
-    convert _ val t = do
+    convert typeTag val t = do
         cval <- toValue val
-        let conv = RCOVar <$> bindName (Convert Nothing cval t)
-            catCmd = return (RCOCmd (ClCat cval))
-        case (cval, t) of
-            (Lit{}, TypeString) -> catCmd
-            (Var{}, TypeString) -> catCmd
-            (Var{}, TypeBundle) -> conv
-            (Dir{}, TypeString) -> catCmd
-            (Str s, TypeBundle) -> return (RCOLit (BundleName s))
-            -- record
-            _ -> error "errors in RCO convert"
+        let catCmd v = return (RCOCmd (ClCat v))
+            valType = fromMaybe (error "no type tag in RCO convert") typeTag
+            makeVar c = Var <$> (bindName c)
+            mapWithKeyM f m = sequence (M.mapWithKey f m)
+            castFromTo :: Value -> CodaType -> CodaType -> RCOPass Value
+            castFromTo fval fty tty 
+                | fty `isSubtypeOf` tty = return fval
+                | otherwise = case fty of
+                    TypeBundle -> case tty of
+                        TypeString -> catCmd fval >>= toValue
+                        TypeRecord dt -> do
+                            rcd <- Dict <$> 
+                                mapWithKeyM (\ k t -> castBundle (Dir fval k) t) dt
+                            makeVar rcd
+                        TypeBundle -> return fval
+                    TypeRecord fdict -> case tty of
+                        TypeBundle -> do
+                            bdRec <-  
+                                mapWithKeyM (\k t -> castFromTo (Dir fval k) t TypeBundle) fdict
+                            resDict <- makeVar (Dict bdRec)
+                            makeVar (Convert Nothing resDict TypeBundle)
+                        TypeRecord tdict -> do
+                            let convRecEle :: Text -> CodaType -> CodaType -> RCOPass Value
+                                convRecEle k ft tt = 
+                                    castFromTo (Dir fval k) ft tt
+                            proRec <- Dict <$> sequence (M.intersectionWithKey convRecEle fdict tdict)
+                            makeVar proRec
+                        TypeString -> error "RCO: convert record to string"           
+                    TypeString -> case tty of
+                        TypeBundle -> makeVar (Convert (Just fty) fval tty)
+                        TypeString -> return fval
+                        TypeRecord{} -> error "RCO: convert string to record"
+            castBundle bd ty = case ty of
+                TypeBundle -> return bd
+                _ -> castFromTo bd TypeBundle ty
+        RCOVar <$> (castFromTo cval valType t >>= bindName)
+
+
+
     dict rs =
         RCORec <$> traverse (>>= toValue) rs
