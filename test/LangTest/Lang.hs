@@ -20,6 +20,7 @@ import Lang.TypeCheck(typeCheck)
 import Data.Text.Prettyprint.Doc.Render.Text(renderStrict)
 import Data.Text.Prettyprint.Doc (layoutCompact)
 import           Numeric                        ( showHex )
+import Lang.EliminateRecord (runER)
 
 
 import RIO
@@ -228,6 +229,13 @@ instance Arbitrary RandCodaRCO where
     RandCodaTypeCheck old cv <- arbitrary
     return (RandCodaRCO old (testRCO cv))
 
+data RandCodaER = RandCodaER CodaVal CodaVal
+      deriving (Show, Read, Eq)
+instance Arbitrary RandCodaER where
+  arbitrary = do
+    RandCodaRCO old cv <- arbitrary
+    return (RandCodaER old (runER cv))
+
 -- short functions for writing expression
 
 instance IsString CodaVal where
@@ -301,6 +309,7 @@ isConvert :: RCOCheck
 isConvert c@(Convert f v t) = case (f, t) of
   (Just TypeString, TypeBundle) -> msum [isStr v, isVar v, isDir v, err]
   (Just TypeRecord{}, TypeBundle) -> msum [isVar v, err]
+  (_, TypeRecord{}) -> err
   _ -> isVar v
   where
     err = showError "isConvert" c
@@ -324,6 +333,31 @@ checkRCO :: CodaVal -> Bool
 checkRCO v = case isRCO v of 
   Right _ -> True
   Left s -> error s
+
+-- elminate record check
+isERRet :: RCOCheck
+isERRet (Dict d) = mapM_ isERRet d
+isERRet v = isValue v
+
+isERRes :: RCOCheck
+isERRes (Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert]), isERRes body]
+  where
+    isCMD :: RCOCheck
+    isCMD (Cl cmd) = traverse_ isValue cmd
+    isCMD v = showError "isCMD" v
+    isConvert c@(Convert _ v ty) = case ty of
+      TypeString -> isValue v
+      TypeBundle -> isValue v
+      _ -> showError "isConvert" c
+    isConvert c = showError "isConvert" c
+isERRes v = isERRet v
+
+checkER :: CodaVal -> Bool
+checkER v = case isERRes v of 
+  Right _ -> True
+  Left s -> error s
+
+testER = runER
 
 dummyInterpret = testInterpret
 dummyInterpretWIntfrc = testInterpretWIntrfc
@@ -359,3 +393,5 @@ testTypeCheckVal c = either (error . T.unpack) snd (typeCheck c)
 
 typeCompat :: CodaType -> CodaType -> Bool
 typeCompat = isSubtypeOf
+
+

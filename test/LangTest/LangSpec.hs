@@ -86,11 +86,6 @@ pprintSpec = describe "pretty-printer test" $ do
     testPrinter "full width" testPPrint
     testPrinter "default width" testPPrintShow
     testPrinter "compact" testPPrintCompact
-    -- codaval -> typecheck -> RCO -> pprint -> parse -> RCO -> interpret (should produce same results)
-    -- let doParse = fromJust . testParse
-    --     pipelined ast = testRCO (doParse (testPPrint ast))
-    -- it "same results after parse back from RCO" $ property $
-    --     (\(RandCodaRCO old cv) -> dummyInterpret (pipelined cv) == dummyInterpret old)
                     
 
 typeCheckSpec :: Spec
@@ -127,6 +122,19 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
         (\(RandCodaRCO _ cv) -> checkRCO cv)
     it "same_result_after_RCO" $ property
         (\(RandCodaRCO old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret cv))
+
+doParse = fromJust . testParse
+pipelined ast = testER (testRCO (testTypeCheckVal (doParse (testPPrint ast))))
+
+erSpec :: Spec
+erSpec = describe "eliminate record" $ do
+    it "random_gen_ER AST" $ property
+        (\(RandCodaER _ cv) -> checkER cv)
+    it "same_result_after_ER" $ property
+        (\(RandCodaER old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret cv))
+    -- codaval -> typecheck -> RCO -> pprint -> parse -> RCO -> interpret (should produce same results)
+    -- it "same results after parse back from ER" $ property $
+    --     (\(RandCodaER old cv) -> dummyInterpret (pipelined cv) == dummyInterpret old)
 
 interpretInterface :: Spec
 interpretInterface = do

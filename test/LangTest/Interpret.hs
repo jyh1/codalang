@@ -61,6 +61,7 @@ instance CodaLangEnv InterApp CodaTestRes where
                 cmdlog %= (LogRun cmd' :)
                 RunRes <$> getCounter
             ClCat val -> runCat val
+            ClMake val -> runMake val
     dir val sub = return $ makeDir val sub
     clet varn val body = do
         valres <- val
@@ -78,8 +79,9 @@ instance CodaLangEnv InterApp CodaTestRes where
                     CatRes i -> return (RunRes i)
                     DictRes dict -> do
                         resD <- mapM (`makeConvert` TypeBundle) dict
-                        cmdlog %= (LogMake (M.toList resD) :)
-                        MakeRes <$> getCounter
+                        runMake (M.toList resD)
+                        -- cmdlog %= (LogMake (M.toList resD) :)
+                        -- MakeRes <$> getCounter
                     _ -> return val
                 TypeRecord d -> case val of
                     DictRes vd -> DictRes <$> (sequence $
@@ -114,6 +116,10 @@ runCat val = do
     cmdlog %= (LogCat val :)
     CatRes <$> getCounter
 
+runMake :: [(Text, CodaTestRes)] -> InterApp CodaTestRes
+runMake ds = do
+    cmdlog %= (LogMake ds :)
+    MakeRes <$> getCounter
 -- return logs of runned command and final result
 testInterpret :: CodaVal -> ([CmdLog CodaTestRes], CodaTestRes)
 testInterpret cv = (_cmdlog env, res)
