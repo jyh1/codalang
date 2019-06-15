@@ -35,6 +35,7 @@ runCoda cv = case cv of
         res <- prepLetRhs v val
         at v ?= res
         runCoda body
+    Dict d -> (RuntimeRecord . M.toList) <$> mapM runCoda d
     _ -> error "Impossible happened: not an RCO expr"
 
 prepLetRhs :: (Exec m a, Ord a) => Text -> CodaVal -> RunCoda m a
@@ -53,6 +54,7 @@ prepLetRhs vn cv = case cv of
                     RuntimeString s    -> (Plain s, [])
                     RuntimeBundle b ps -> (BundleRef depInfo [], [(v, depInfo)])
                         where depInfo = Deps b ps
+                    _ -> error "Record not in final result"
             Dir{} -> do
                 (v, vpath) <- dirRootLookup dirRoot
                 let depInfo = Deps v vpath
@@ -67,11 +69,15 @@ prepLetRhs vn cv = case cv of
     Cl (ClCat val) -> do
         valDep <- toDep <$> runCoda val
         lift (clCat vn valDep)
-    Convert _ val TypeRecord{} -> do
+    Cl (ClMake ks) -> do
+        valKs <- (traverse . _2) (\v -> toDep <$> (runCoda v)) ks
+        lift (emptyBundle <$> clMake vn valKs)
+    Convert _ val TypeBundle -> do
         valRes <- runCoda val
         case valRes of
             RuntimeString t -> prepLetRhs vn (Lit (BundleName t))
             RuntimeBundle{} -> return valRes
+            RuntimeRecord{} -> error "Cannot convert record"
     Dir{} -> runCoda cv
     Str{} -> runCoda cv
     Lit u -> lift (emptyBundle <$> clLit vn u)

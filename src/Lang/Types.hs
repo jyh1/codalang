@@ -108,6 +108,9 @@ class (Monad m) => Exec m a where
     clRun :: Text -> Map Text (Deps a) -> [CMDEle Text] -> m a
     clCat :: Text -> Deps a -> m (RuntimeRes a)
     clLit :: Text -> UUID -> m a
+    clMake :: Text -> [(Text, Deps a)] -> m a
 
-data RuntimeRes a = RuntimeString Text | RuntimeBundle a [Text]
+data RuntimeRes a = RuntimeString Text 
+    | RuntimeBundle a [Text] 
+    | RuntimeRecord [(Text, RuntimeRes a)]
     deriving (Show, Read, Eq, Ord)
