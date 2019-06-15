@@ -27,14 +27,16 @@ type VarName = Text
 
 -- Codalab command
 
-data Cmd a = Run [a] | ClCat a
+data Cmd a = Run [a] | ClCat a | ClMake [(Text, a)]
     deriving (Eq, Ord, Read, Show, Functor)
 instance Foldable Cmd where
     foldMap f (ClCat a) = f a
     foldMap f (Run as) = foldMap f as
+    foldMap f (ClMake rs) = foldMap (foldMap f) rs
 instance Traversable Cmd where
     traverse f (ClCat a) = ClCat <$> (f a)
     traverse f (Run as) = Run <$> (traverse f as)
+    traverse f (ClMake rs) = ClMake <$> ((traverse . _2) f rs)
 
 type CodaCmd = Cmd CodaVal
 
