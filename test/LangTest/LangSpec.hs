@@ -21,6 +21,7 @@ langSpec = do
     rcoSpec
     pprintSpec
     typeCheckSpec
+    erSpec
     interpretInterface
 
 parseSpec :: Spec
@@ -139,5 +140,5 @@ erSpec = describe "eliminate record" $ do
 interpretInterface :: Spec
 interpretInterface = do
     it "same_result_with_two_interpreters" $ property
-        (\(RandCodaRCO old cv) -> 
+        (\(RandCodaER old cv) -> 
             dummyInterpret cv == dummyInterpretWIntfrc cv)

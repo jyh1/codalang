@@ -9,7 +9,7 @@ module LangTest.Interpret(testInterpret, testInterpretWIntrfc, CodaTestRes(..), 
 
 -- a dummy interpreter for CodaVal for testing purpose
 
-import RIO hiding (to, view, traceShow)
+import RIO hiding (to, view, traceShow, over)
 import Control.Lens
 import qualified RIO.Text as T
 import Control.Monad.State
@@ -76,7 +76,7 @@ instance CodaLangEnv InterApp CodaTestRes where
                     _ -> runCat val
                 TypeBundle -> case val of
                     StrRes s -> return (BunRes (BundleName s))
-                    CatRes i -> return (RunRes i)
+                    CatRes i -> return (CatRes i)
                     DictRes dict -> do
                         resD <- mapM (`makeConvert` TypeBundle) dict
                         runMake (M.toList resD)
@@ -147,6 +147,7 @@ instance Exec InterApp CodaTestRes where
                             
     clLit _ u = return (BunRes u)
     clCat _ v = (`RuntimeBundle` []) <$> runCat (fromDep v [])
+    clMake _ ks = runMake (over (traverse . _2) (`fromDep` []) ks)
 
 fromDep (Deps tres depPath) elePath
     | null ps = tres
@@ -157,14 +158,15 @@ fromDep (Deps tres depPath) elePath
         ps = depPath ++ elePath
 
 testInterpretWIntrfc :: CodaVal -> ([CmdLog CodaTestRes], CodaTestRes)
-testInterpretWIntrfc cv = (_cmdlog env, newRes)
+testInterpretWIntrfc cv = (_cmdlog env, newRes res)
     where
         app :: InterApp (RuntimeRes CodaTestRes)
         app = evalCoda cv
         (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0))
-        newRes = case res of
+        newRes res = case res of
             RuntimeString t -> StrRes t
             RuntimeBundle m ps -> case (m, ps) of
                 (DirRes r rps, _) -> DirRes r (rps ++ ps)
                 (other, []) -> other
                 (other, ps) -> DirRes other ps
+            RuntimeRecord ks -> DictRes (newRes <$> M.fromList ks)
