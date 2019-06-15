@@ -6,6 +6,7 @@ module Lang.Lang
     , module Lang.TypeCheck
     , module Lang.PPrint
     , module Lang.Fold
+    , module Lang.EliminateRecord
     )
 where
 
@@ -16,3 +17,4 @@ import           Lang.Types
 import           Lang.TypeCheck
 import           Lang.PPrint
 import           Lang.Fold
+import           Lang.EliminateRecord
