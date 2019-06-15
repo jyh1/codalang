@@ -25,7 +25,6 @@ data CodaTestRes = BunRes UUID
     | RunRes Int 
     | DirRes CodaTestRes [Text] 
     | StrRes Text 
-    | CatRes Int
     | DictRes (Map Text CodaTestRes)
     | MakeRes Int
     deriving (Show, Read, Eq, Ord)
@@ -72,16 +71,12 @@ instance CodaLangEnv InterApp CodaTestRes where
             makeConvert val vt = case vt of
                 TypeString -> case val of
                     StrRes{} -> return val
-                    CatRes{} -> return val
                     _ -> runCat val
                 TypeBundle -> case val of
                     StrRes s -> return (BunRes (BundleName s))
-                    CatRes i -> return (CatRes i)
                     DictRes dict -> do
                         resD <- mapM (`makeConvert` TypeBundle) dict
                         runMake (M.toList resD)
-                        -- cmdlog %= (LogMake (M.toList resD) :)
-                        -- MakeRes <$> getCounter
                     _ -> return val
                 TypeRecord d -> case val of
                     DictRes vd -> DictRes <$> (sequence $
@@ -111,10 +106,12 @@ makeDir val sub =
         where
             keepDirRes = error "Undefined key in record"
 
-runCat :: CodaTestRes -> InterApp CodaTestRes
-runCat val = do
+runCatTxt :: CodaTestRes -> InterApp Text
+runCatTxt val = do
     cmdlog %= (LogCat val :)
-    CatRes <$> getCounter
+    (("catres" <>) . tshow) <$> getCounter
+
+runCat v = StrRes <$> runCatTxt v
 
 runMake :: [(Text, CodaTestRes)] -> InterApp CodaTestRes
 runMake ds = do
@@ -146,8 +143,8 @@ instance Exec InterApp CodaTestRes where
                             fromDep eleDep ps
                             
     clLit _ u = return (BunRes u)
-    clCat _ v = (`RuntimeBundle` []) <$> runCat (fromDep v [])
-    clMake _ ks = runMake (over (traverse . _2) (`fromDep` []) ks)
+    clCat _ v = RuntimeString <$> runCatTxt (fromDep v [])
+    clMake _ ks = runMake (over (traverse . _2) ( `fromDep` []) ks)
 
 fromDep (Deps tres depPath) elePath
     | null ps = tres
@@ -156,6 +153,10 @@ fromDep (Deps tres depPath) elePath
         _ -> DirRes tres ps
     where
         ps = depPath ++ elePath
+
+-- catToBundle (CatRes i) = RunRes i
+-- catToBundle (DirRes k p) = DirRes (catToBundle k) p
+-- catToBundle v = v
 
 testInterpretWIntrfc :: CodaVal -> ([CmdLog CodaTestRes], CodaTestRes)
 testInterpretWIntrfc cv = (_cmdlog env, newRes res)
