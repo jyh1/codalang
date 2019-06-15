@@ -132,9 +132,9 @@ erSpec = describe "eliminate record" $ do
         (\(RandCodaER _ cv) -> checkER cv)
     it "same_result_after_ER" $ property
         (\(RandCodaER old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret cv))
-    -- codaval -> typecheck -> RCO -> pprint -> parse -> RCO -> interpret (should produce same results)
-    -- it "same results after parse back from ER" $ property $
-    --     (\(RandCodaER old cv) -> dummyInterpret (pipelined cv) == dummyInterpret old)
+    -- codaval -> typecheck -> RCO -> er -> pprint -> parse -> RCO -> er -> interpret (should produce same results)
+    it "same results after parse back from ER" $ property $
+        (\(RandCodaER old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret (pipelined cv)))
 
 interpretInterface :: Spec
 interpretInterface = do
