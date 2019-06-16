@@ -152,9 +152,8 @@ typeAnnotation = hasAnnot <?> "type annotation"
                 typeStr = makeKeyword "string" $> TypeString
                 typeBun = TypeRecord . M.fromList <$> parseDicSyntax (token dictKey) (token typeExpr)
                 typeBunAll = makeKeyword "bundle" $> TypeBundle
-                typeFile = makeKeyword "file" $> (TypeRecord mempty)
-                typeBunDict = typeBunAll <|> typeBun <|> typeFile
-
+                typeBunDict = typeBunAll <|> typeBun 
+                
 dictExpr :: (TokenParsing m) => m ParseRes
 dictExpr = do
     let dict = M.fromList <$> parseDicSyntax (token dictKey) codaExpr

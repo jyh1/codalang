@@ -70,9 +70,7 @@ dictAnno ads = group (align $ encloseSep (flatAlt ("{" <> line <> "  ") "{") (fl
 instance (Pretty CodaType) where
     pretty TypeString = "string"
     pretty TypeBundle = "bundle"
-    pretty (TypeRecord dict) 
-        | M.null dict = "file"
-        | otherwise = dictAnno [ (pretty k, pretty v) | (k, v) <- M.toList dict]
+    pretty (TypeRecord dict) = dictAnno [ (pretty k, pretty v) | (k, v) <- M.toList dict]
 
 instance CodaLangEnv PPPass PPrint where
     lit u = case u of

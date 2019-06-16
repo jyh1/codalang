@@ -71,7 +71,7 @@ doRend rc = case rc of
     RType ct -> case ct of
         TypeString -> doRend (spaceSymbol "string")
         TypeBundle -> doRend (spaceSymbol "bundle")
-        TypeRecord d -> if M.null d then oneof [bracketRend, doRend (spaceSymbol "file")] else bracketRend
+        TypeRecord d -> bracketRend
             where
                 bracketRend = doRend (RDic (RType <$> d))
     RDic dic -> doRend (enloseParen "{" "}" (RLis annotComma))
