@@ -45,7 +45,7 @@ type Env = [(Text, Text)]
 
 -- assign to let
 data AssignForm = Variable VarName
-    | Global VarName
+    | OptionVar VarName
     deriving (Eq, Ord, Read, Show)
 
 -- CodaLang AST

@@ -100,7 +100,7 @@ letExpr = highlight Constructor (token (expr <?> "let_exprssions"))
         where 
             stmt = token (liftA2 (,) assignable (symbolic '=' *> codaExpr))
             globalVar :: (TokenParsing m) => m AssignForm
-            globalVar = Global <$> (text "--" *> varName)
+            globalVar = OptionVar <$> (text "--" *> varName)
             assignable = globalVar <|> (Variable <$> varName)
 
 -- | used to build dir expression and paren expression
