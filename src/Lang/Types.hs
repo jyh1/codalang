@@ -48,6 +48,11 @@ data AssignForm = Variable VarName
     | OptionVar VarName
     deriving (Eq, Ord, Read, Show)
 
+printAssignForm :: AssignForm -> Text
+printAssignForm af = case af of
+    Variable v -> v
+    OptionVar v -> "--" <> v
+
 -- CodaLang AST
 data CodaVal = Lit UUID
     | Var VarName

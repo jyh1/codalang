@@ -149,9 +149,7 @@ rendCoda cv = case cv of
             getLetLis :: CodaVal -> ([RendCoda], RendCoda)
             getLetLis (Let assign val1 body1) =
                 let 
-                    v1 = case assign of
-                        Variable v -> v
-                        OptionVar v -> "--" <> v
+                    v1 = printAssignForm assign
                     enwAs = RLis [spaceSymbol v1, spaceSymbol "=", rendCoda val1]
                 in
                     over _1 (enwAs:) (getLetLis body1)
