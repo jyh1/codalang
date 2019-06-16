@@ -68,9 +68,11 @@ dictAnno ads = group (align $ encloseSep (flatAlt ("{" <> line <> "  ") "{") (fl
         dicLis = [hang 4 (k <> ":" <+> v) | (k, v) <- ads]
 
 instance (Pretty CodaType) where
-    pretty TypeString = "String"
-    pretty TypeBundle = "{_}"
-    pretty (TypeRecord dict) = dictAnno [ (pretty k, pretty v) | (k, v) <- M.toList dict]
+    pretty TypeString = "string"
+    pretty TypeBundle = "bundle"
+    pretty (TypeRecord dict) 
+        | M.null dict = "file"
+        | otherwise = dictAnno [ (pretty k, pretty v) | (k, v) <- M.toList dict]
 
 instance CodaLangEnv PPPass PPrint where
     lit u = case u of
@@ -108,7 +110,7 @@ instance CodaLangEnv PPPass PPrint where
             Value d -> PLet [stmt] d
             PTypeAnno d -> PLet [stmt] d
             PLet ss d -> PLet (stmt : ss) d
-    convert _ val ct = return (PTypeAnno (annotate TypeAnno (align (toAnnoDocWithParen val <+> "::" <+> pretty ct))))
+    convert _ val ct = return (PTypeAnno (annotate TypeAnno (align (toAnnoDocWithParen val <+> "as" <+> pretty ct))))
     dict d = do
         dres <- sequence d
         return (Value (dictAnno [ (pretty k, toAnnoDoc v) | (k, v) <- M.toList dres]))

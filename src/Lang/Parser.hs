@@ -145,14 +145,15 @@ dictKey = T.pack <$> (some fileNameChar) <?> "type dictionary key"
 typeAnnotation :: (TokenParsing m) => m CodaType
 typeAnnotation = hasAnnot <?> "type annotation"
     where
-        hasAnnot = symbol "::" *> typeExpr
+        hasAnnot = makeKeyword "as" *> typeExpr
         typeExpr :: (TokenParsing m) => m CodaType
         typeExpr = typeStr <|> typeBunDict <?> "type expression"
             where
-                typeStr = makeKeyword "String" $> TypeString
+                typeStr = makeKeyword "string" $> TypeString
                 typeBun = TypeRecord . M.fromList <$> parseDicSyntax (token dictKey) (token typeExpr)
-                typeBunAll = braces (symbol "_") $> TypeBundle
-                typeBunDict = try typeBunAll <|> typeBun
+                typeBunAll = makeKeyword "bundle" $> TypeBundle
+                typeFile = makeKeyword "file" $> (TypeRecord mempty)
+                typeBunDict = typeBunAll <|> typeBun <|> typeFile
 
 dictExpr :: (TokenParsing m) => m ParseRes
 dictExpr = do

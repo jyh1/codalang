@@ -59,12 +59,12 @@ parseSpec = describe "CodaVal_parser" $ do
     it "type_annotation" $ do
         let l2 = l "02"
             l2xy = d l2 ["x", "y"]
-        parseSucc "0x02 :: String" (cv l2 ts)
-        parseSucc "0x02 :: {}" (cv l2 emptBd)
-        parseSucc "0x02 :: {_}" (cv l2 abd)
-        parseSucc "0x02/x/y :: String" (cv l2xy ts)
-        parseSucc "0x02/x/y :: { a: String, b :{}}" (cv l2xy (bd [("a", ts), ("b", emptBd)]))
-        parseSucc "0x02/x/y :: { a: String, b :{_ }}" (cv l2xy (bd [("a", ts), ("b", abd)]))
+        parseSucc "0x02 as string" (cv l2 ts)
+        parseSucc "0x02 as {}" (cv l2 emptBd)
+        parseSucc "0x02 as bundle" (cv l2 abd)
+        parseSucc "0x02/x/y as string" (cv l2xy ts)
+        parseSucc "0x02/x/y as { a: string, b :{}}" (cv l2xy (bd [("a", ts), ("b", emptBd)]))
+        parseSucc "0x02/x/y as { a: string, b :bundle}" (cv l2xy (bd [("a", ts), ("b", abd)]))
     it "dictionary" $ do
         parseSucc "{xx:0x1}" (dict [("xx", l "1")])
         parseSucc "{x:0x1, y:0x02/a}" (dict [("x", l "1"), ("y", d (l "02") ["a"])])

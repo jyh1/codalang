@@ -43,7 +43,7 @@ entSym :: Text -> RendCoda
 entSym = entity . Symbol
 
 singleColon = ColonAnnot ":"
-doubleColon = ColonAnnot "::"
+castSymbol = ColonAnnot " as "
 
 doRend :: RendCoda -> Gen String
 doRend rc = case rc of
@@ -69,9 +69,11 @@ doRend rc = case rc of
             doRend (RLis (concat [[space1Symbol "let"], newAs, [space1Symbol "in", RLet rest body]]))
     ColonAnnot t val anot -> doRend (RLis [val, spaceSymbol t, anot])
     RType ct -> case ct of
-        TypeString -> doRend (spaceSymbol "String")
-        TypeBundle -> doRend (enloseParen "{" "}" (spaceSymbol "_"))
-        TypeRecord d -> doRend (RDic (RType <$> d))
+        TypeString -> doRend (spaceSymbol "string")
+        TypeBundle -> doRend (spaceSymbol "bundle")
+        TypeRecord d -> if M.null d then oneof [bracketRend, doRend (spaceSymbol "file")] else bracketRend
+            where
+                bracketRend = doRend (RDic (RType <$> d))
     RDic dic -> doRend (enloseParen "{" "}" (RLis annotComma))
         where
             annotLis = [singleColon (spaceSymbol k) v | (k, v) <- M.toList dic]
@@ -151,7 +153,7 @@ rendCoda cv = case cv of
                 in
                     over _1 (enwAs:) (getLetLis body1)
             getLetLis other = ([], rendCoda other)
-    Convert _ val ct -> entity (doubleColon rendVal (RType ct))
+    Convert _ val ct -> entity (castSymbol rendVal (RType ct))
         where
             rendVal = case val of
                 Let{} -> Parens1 (rendCoda val)
