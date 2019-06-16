@@ -43,13 +43,18 @@ type CodaCmd = Cmd CodaVal
 -- Command options
 type Env = [(Text, Text)]
 
+-- assign to let
+data AssignForm = Variable VarName
+    | Global VarName
+    deriving (Eq, Ord, Read, Show)
+
 -- CodaLang AST
 data CodaVal = Lit UUID
     | Var VarName
     | Cl CodaCmd
     | Str Text
     | Dir CodaVal Text
-    | Let VarName CodaVal CodaVal
+    | Let AssignForm CodaVal CodaVal
     -- value targettype fromtype
     | Convert (Maybe CodaType) CodaVal CodaType
     | Dict (Map Text CodaVal)

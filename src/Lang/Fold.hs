@@ -23,7 +23,7 @@ class (Monad m) => CodaLangEnv m a where
     str :: Text -> m a
     cl :: Cmd (m a) -> m a
     dir :: a -> Text -> m a
-    clet :: VarName -> m a -> m a -> m a
+    clet :: AssignForm -> m a -> m a -> m a
     convert :: (Maybe CodaType) -> a -> CodaType -> m a
     dict :: Map Text (m a) -> m a
 
