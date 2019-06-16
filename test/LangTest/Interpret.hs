@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -32,7 +33,14 @@ data CodaTestRes = BunRes UUID
 data CmdLog a = LogRun [a] | LogCat a | LogMake [(Text, a)]
     deriving (Show, Read, Eq, Ord)
 
-data CodaInterEnv a = CodaInterEnv {_envmap :: VarMap a, _cmdlog :: [CmdLog a], _counter :: Int}
+type OptionEnv a = [(Text, a)]
+
+data CodaInterEnv a = CodaInterEnv {
+      _envmap :: VarMap a
+    , _cmdlog :: [(OptionEnv a, CmdLog a)]
+    , _counter :: Int
+    , _optionvars :: OptionEnv a
+    }
     deriving (Show, Read, Eq)
 makeLenses ''CodaInterEnv
 
@@ -57,14 +65,21 @@ instance CodaLangEnv InterApp CodaTestRes where
         cmd <- sequenceA clcmd
         case cmd of
             Run cmd' -> do
-                cmdlog %= (LogRun cmd' :)
+                makeLog (LogRun cmd')
                 RunRes <$> getCounter
             ClCat val -> runCat val
             ClMake val -> runMake val
     dir val sub = return $ makeDir val sub
-    clet (Variable varn) val body = do
+    clet af val body = do
         valres <- val
-        withVar varn valres body
+        case af of
+            Variable varn -> withVar varn valres body
+            OptionVar varn -> do
+                optionvars %= ((varn, valres):)
+                res <- body
+                optionvars %= tail
+                return res
+        
     convert tt val vt = makeConvert val vt
         where
             makeConvert :: CodaTestRes -> CodaType -> InterApp CodaTestRes
@@ -108,27 +123,33 @@ makeDir val sub =
 
 runCatTxt :: CodaTestRes -> InterApp Text
 runCatTxt val = do
-    cmdlog %= (LogCat val :)
+    makeLog (LogCat val)
     (("catres" <>) . tshow) <$> getCounter
 
 runCat v = StrRes <$> runCatTxt v
 
+makeLog cmd = do
+    oe <- use optionvars
+    cmdlog %= ((oe, cmd) :)
+
 runMake :: [(Text, CodaTestRes)] -> InterApp CodaTestRes
 runMake ds = do
-    cmdlog %= (LogMake ds :)
+    makeLog (LogMake ds)
     MakeRes <$> getCounter
 -- return logs of runned command and final result
-testInterpret :: CodaVal -> ([CmdLog CodaTestRes], CodaTestRes)
+type TestInterpret = CodaVal -> ([(OptionEnv CodaTestRes, CmdLog CodaTestRes)], CodaTestRes)
+
+testInterpret :: TestInterpret
 testInterpret cv = (_cmdlog env, res)
     where
         app :: InterApp CodaTestRes
         app = foldCoda cv
-        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0))
+        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 []))
 
 -- use interpret interface (after RCO)
 instance Exec InterApp CodaTestRes where
     clRun _ deps cmd = do
-        cmdlog %= (LogRun resCmd :)
+        cmdlog %= (([], LogRun resCmd) :)
         c <- getCounter
         return (RunRes c)
         where
@@ -158,12 +179,12 @@ fromDep (Deps tres depPath) elePath
 -- catToBundle (DirRes k p) = DirRes (catToBundle k) p
 -- catToBundle v = v
 
-testInterpretWIntrfc :: CodaVal -> ([CmdLog CodaTestRes], CodaTestRes)
+testInterpretWIntrfc :: TestInterpret
 testInterpretWIntrfc cv = (_cmdlog env, newRes res)
     where
         app :: InterApp (RuntimeRes CodaTestRes)
         app = evalCoda cv
-        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0))
+        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 []))
         newRes res = case res of
             RuntimeString t -> StrRes t
             RuntimeBundle m ps -> case (m, ps) of

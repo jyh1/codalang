@@ -69,6 +69,11 @@ instance LocalVar TCState TCPass (TCRes CodaVal)
 throwErr :: TypeError -> TCPass a
 throwErr err = lift (Left err)
 
+expectType :: CodaType -> CodaType -> CodaVal -> TCPass ()
+expectType exp got ast
+        | exp /= got = throwErr (TypeError (Mismatch exp got) ast)
+        | otherwise = return ()
+
 instance CodaLangEnv TCPass (TCRes CodaVal) where
     lit u = return (makeRes TypeBundle (Lit u))
     var vn = do
@@ -96,10 +101,13 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         where
             ast = resOrig val
             tagType t = fmapT t (`Dir` sub) val
-    clet (Variable vn) val body = do
+    clet af val body = do
         valRes <- val
-        bodyRes <- withVar vn (Var vn <$ valRes) body
-        return (liftRes2 (Let (Variable vn)) valRes bodyRes)
+        bodyRes <- case af of
+            Variable vn -> withVar vn (Var vn <$ valRes) body
+            OptionVar{} -> 
+                expectType TypeString (resType valRes) (resOrig valRes) >> body
+        return (liftRes2 (Let af) valRes bodyRes)
     convert _ val vt 
         = case (ty, vt) of
             (TypeRecord{}, TypeString) -> castErr

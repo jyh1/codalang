@@ -136,11 +136,16 @@ randCl = Cl <$> randCmd
 randLet :: CodaType -> GenEnv CodaVal
 randLet t = do
   varName <- lift randAssign
-  (vt, val) <- halfDepth randCodaVal
   let bodyGen = case varName of
-        Variable var -> withVar var vt (randTree t)
-        _ -> randTree t
-  body <- decDepth bodyGen
+        Variable var -> do
+          (vt, val) <- halfDepth randCodaVal
+          body <- withVar var vt (randTree t)
+          return (val, body)
+        _ -> do
+          val <- halfDepth (randTree TypeString)
+          body <- randTree t
+          return (val, body)
+  (val, body) <- decDepth bodyGen
   return (Let varName val body)
   where
     randAssign :: Gen AssignForm
@@ -373,7 +378,7 @@ testER = runER
 dummyInterpret = testInterpret
 dummyInterpretWIntfrc = testInterpretWIntrfc
 
-checkInterpretRes ::  ([CmdLog CodaTestRes], CodaTestRes) ->  ([CmdLog CodaTestRes], CodaTestRes) -> Bool
+checkInterpretRes :: (Eq a) => (a, CodaTestRes) ->  (a, CodaTestRes) -> Bool
 checkInterpretRes (l1s, r1) (l2s, r2) = 
   l1s == l2s && checkRes r1 r2
   where
