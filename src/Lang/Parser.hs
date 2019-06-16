@@ -29,7 +29,7 @@ import           Control.Lens                   ( _2 )
 data ParseRes = PLit Text
     | PVar Text
     | PStr Text
-    | PLet [(Text, ParseRes)] ParseRes
+    | PLet [(AssignForm, ParseRes)] ParseRes
     | PRun [ParseRes]
     | PDir ParseRes [Text]
     | PConv ParseRes [CodaType]
@@ -95,9 +95,13 @@ letExpr = highlight Constructor (token (expr <?> "let_exprssions"))
     expr =
         liftA2 PLet (letkey *> sepEndBy (try letStmt) semi <* inkey) codaExpr
 
-    letStmt :: (TokenParsing m) => m (Text, ParseRes)
+    letStmt :: (TokenParsing m) => m (AssignForm, ParseRes)
     letStmt = highlight Statement stmt <?> "let statement"
-        where stmt = token (liftA2 (,) varName (symbolic '=' *> codaExpr))
+        where 
+            stmt = token (liftA2 (,) assignable (symbolic '=' *> codaExpr))
+            globalVar :: (TokenParsing m) => m AssignForm
+            globalVar = Global <$> (text "--" *> varName)
+            assignable = globalVar <|> (Variable <$> varName)
 
 -- | used to build dir expression and paren expression
 followedByList
@@ -153,7 +157,7 @@ typeAnnotation = hasAnnot <?> "type annotation"
                 typeBun = TypeRecord . M.fromList <$> parseDicSyntax (token dictKey) (token typeExpr)
                 typeBunAll = makeKeyword "bundle" $> TypeBundle
                 typeBunDict = typeBunAll <|> typeBun 
-                
+
 dictExpr :: (TokenParsing m) => m ParseRes
 dictExpr = do
     let dict = M.fromList <$> parseDicSyntax (token dictKey) codaExpr
