@@ -92,7 +92,7 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         TypeBundle -> return (tagType TypeBundle)
         TypeRecord dic -> do
             let dicEle = (return . tagType) <$> M.lookup sub dic
-            fromMaybe (throwErr (TypeError (KeyError sub) ast)) dicEle
+            fromMaybe (throwErr (TypeError (KeyError sub) (Dir ast sub))) dicEle
         where
             ast = resOrig val
             tagType t = fmapT t (`Dir` sub) val
