@@ -96,10 +96,10 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         where
             ast = resOrig val
             tagType t = fmapT t (`Dir` sub) val
-    clet vn val body = do
+    clet (Variable vn) val body = do
         valRes <- val
         bodyRes <- withVar vn (Var vn <$ valRes) body
-        return (liftRes2 (Let vn) valRes bodyRes)
+        return (liftRes2 (Let (Variable vn)) valRes bodyRes)
     convert _ val vt 
         = case (ty, vt) of
             (TypeRecord{}, TypeString) -> castErr

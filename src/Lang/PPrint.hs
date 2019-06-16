@@ -99,7 +99,7 @@ instance CodaLangEnv PPPass PPrint where
         ClMake ks -> dict (M.fromList ks) >>= (\v -> convert Nothing v TypeBundle)
     dir bval sub = 
         ranno DirAnno (toAnnoDocWithParen bval <> "/" <> pretty sub)
-    clet vn val body = do
+    clet (Variable vn) val body = do
         c <- getCounter
         valdoc <- toAnnoDoc <$> val
         let stmt = annotate StmtAnno (hsep [pretty vn, "=", valdoc])

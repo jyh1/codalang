@@ -59,12 +59,14 @@ oneofGenEnv :: [GenEnv a] -> GenEnv a
 oneofGenEnv gs = join (lift (elements gs))
 
 
-randVar :: GenEnv Text
-randVar = lift $ frequency [
+genVar :: Gen Text
+genVar = frequency [
       (2, return "x")
     , (2, return "y")
     , (6, randVarName)
   ]
+randVar :: GenEnv Text
+randVar = lift genVar
 randVarName :: Gen Text
 randVarName = 
   let alpha = choose ('a', 'z')
@@ -133,10 +135,19 @@ randCl = Cl <$> randCmd
 
 randLet :: CodaType -> GenEnv CodaVal
 randLet t = do
-  varName <- randVar
+  varName <- lift randAssign
   (vt, val) <- halfDepth randCodaVal
-  body <- decDepth (withVar varName vt (randTree t))
+  let bodyGen = case varName of
+        Variable var -> withVar var vt (randTree t)
+        _ -> randTree t
+  body <- decDepth bodyGen
   return (Let varName val body)
+  where
+    randAssign :: Gen AssignForm
+    randAssign = frequency [
+        (5, Variable <$> genVar)
+      , (1, OptionVar <$> genVar)
+      ]
 
 randConvert :: CodaType -> GenEnv CodaVal
 randConvert t = do
@@ -258,7 +269,7 @@ l = Lit . UUID
 d :: CodaVal -> [Text] -> CodaVal
 d = foldl Dir
 clet :: CodaVal -> [(Text, CodaVal)] -> CodaVal
-clet = foldr (uncurry Let)
+clet = foldr (\(k, v) -> Let (Variable k) v)
 tmpN :: Int -> Text
 tmpN n = tmpName <> "-" <> tshow n
 tmpNV :: Int -> CodaVal

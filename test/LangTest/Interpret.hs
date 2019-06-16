@@ -62,7 +62,7 @@ instance CodaLangEnv InterApp CodaTestRes where
             ClCat val -> runCat val
             ClMake val -> runMake val
     dir val sub = return $ makeDir val sub
-    clet varn val body = do
+    clet (Variable varn) val body = do
         valres <- val
         withVar varn valres body
     convert tt val vt = makeConvert val vt

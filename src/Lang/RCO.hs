@@ -57,7 +57,7 @@ withLocal v app = do
     return val
 -- lang rco
 runRCO :: CodaVal -> CodaVal
-runRCO cdvl = foldr (uncurry Let) bndl binds
+runRCO cdvl = foldr (\(k,v) -> (Let (Variable k) v)) bndl binds
   where
     foldApp :: RCOPass Bundle
     foldApp        = foldCoda cdvl >>= toValue
@@ -156,7 +156,7 @@ instance CodaLangEnv RCOPass RCORes where
     dir val subdir = do
         (newn, path) <- toSubDir val
         return (RCODir newn (path S.|> subdir))
-    clet vname val body = do
+    clet (Variable vname) val body = do
         newns <- withLocal vname (val >>= toVarName)
         withVar vname newns body
     convert typeTag val t = do

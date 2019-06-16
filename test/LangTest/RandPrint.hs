@@ -147,8 +147,11 @@ rendCoda cv = case cv of
     Let{} -> entity (uncurry RLet (getLetLis cv))
         where
             getLetLis :: CodaVal -> ([RendCoda], RendCoda)
-            getLetLis (Let v1 val1 body1) =
+            getLetLis (Let assign val1 body1) =
                 let 
+                    v1 = case assign of
+                        Variable v -> v
+                        OptionVar v -> "--" <> v
                     enwAs = RLis [spaceSymbol v1, spaceSymbol "=", rendCoda val1]
                 in
                     over _1 (enwAs:) (getLetLis body1)

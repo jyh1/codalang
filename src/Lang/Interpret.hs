@@ -31,7 +31,7 @@ runCoda cv = case cv of
         (v, vpath) <- dirRootLookup bundleVar
         return (RuntimeBundle v (vpath ++ path))
     Str t          -> return (RuntimeString t)
-    Let v val body -> do
+    Let (Variable v) val body -> do
         res <- prepLetRhs v val
         at v ?= res
         runCoda body

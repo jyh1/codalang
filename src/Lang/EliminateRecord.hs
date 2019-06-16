@@ -38,12 +38,12 @@ instance CodaLangEnv ERPass CodaVal where
         _ -> Dir r p
         where
             err = error ("Key error during EliminateRecord: " ++ T.unpack p)
-    clet var res val = do
+    clet (Variable var) res val = do
         resVal <- res
         case resVal of
             Dict{} -> rmVar resVal
             Var{} -> rmVar resVal
-            _ -> Let var resVal <$> val
+            _ -> Let (Variable var) resVal <$> val
         where
             rmVar resVal = (envL %= M.insert var resVal) >> val
     convert fty val tty = case tty of
