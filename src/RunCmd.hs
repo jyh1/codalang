@@ -22,6 +22,9 @@ cmdExec exec = case exec of
         let vstr = T.unpack v
         P.runProcess_ (P.setStdout P.createPipe (makeProc ["wait", vstr]))
         procStdout (makeProc ["cat", vstr])
+    ExecMake ks -> do
+        let cmdstr = buildEnv ks
+        procStdout (makeProc (concat [["make"], cmdstr]))
     where
         procStdout pro = do
             (res, _) <- P.readProcess_ pro

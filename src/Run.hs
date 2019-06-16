@@ -20,7 +20,8 @@ run = do
   tcAST <- runTypeCheck codaAST
   logInfo "remove-complex-operation"
   let rcoAST = runRCO tcAST
-  res <- evalCoda rcoAST :: RIO App (RuntimeRes Text)
+      erAST = runER rcoAST
+  res <- evalCoda erAST :: RIO App (RuntimeRes Text)
   logInfo (display (tshow res))
 
   -- logInfo "Codalang"

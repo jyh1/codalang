@@ -7,7 +7,7 @@
 
 module Types where
 
-import           RIO                     hiding ( view )
+import           RIO                     hiding ( view, over )
 import qualified RIO.Text as T
 import qualified RIO.Text.Partial as T
 import RIO.Char (showLitChar)
@@ -64,8 +64,7 @@ instance Exec (RIO App) Text where
   clRun vn depMap cmd = do
     clcmd <- view appClCmd
     execRes <- liftIO (clcmd execCmd)
-    let uuid = maybe (Left (stringException "No valid UUID returned!")) Right (byteToUUID execRes)
-    resid <- tshow <$> fromEither uuid
+    resid <- parseUUID execRes
     appLog (Assign [EntVerbatim vn, EntParen (EntUUID resid)] (escapeVerbatim <$> cmdTxt))
     return resid
    where
@@ -81,6 +80,12 @@ instance Exec (RIO App) Text where
     return (RuntimeString resText)
     where
       execCmd = ExecCat (fromDeps val)
+  clMake vn ks = do
+    clcmd <- view appClCmd
+    let makeCmd = ExecMake (over (traverse . _2) fromDeps ks)
+    execRes <- liftIO (clcmd makeCmd) >>= parseUUID
+    appLog (Assign [EntVerbatim vn] [EntUUID execRes])
+    return execRes
 
 fromDeps :: Deps Text -> Text
 fromDeps (Deps r ps) = buildPath (r : ps)
@@ -90,3 +95,7 @@ fromEle e = case e of
     Plain t        -> t
     BundleRef r ps -> fromDeps (Deps r ps)
       
+parseUUID :: ByteString -> RIO App Text
+parseUUID res = do
+  let uuid = maybe (Left (stringException "No valid UUID returned!")) Right (byteToUUID res)
+  tshow <$> fromEither uuid
