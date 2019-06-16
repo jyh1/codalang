@@ -180,8 +180,8 @@ instance CodaLangEnv RCOPass RCORes where
                         TypeBundle -> do
                             bdRec <-  
                                 mapWithKeyM (\k t -> castFromTo (Dir fval k) t TypeBundle) fdict
-                            resDict <- makeVar (Dict bdRec)
-                            makeVar (Convert Nothing resDict TypeBundle)
+                            makeCmd <- makeVar (Cl (ClMake (M.toList bdRec)))
+                            makeVar (Convert Nothing makeCmd TypeBundle)
                         TypeRecord tdict -> do
                             let convRecEle :: Text -> CodaType -> CodaType -> RCOPass Value
                                 convRecEle k ft tt = 

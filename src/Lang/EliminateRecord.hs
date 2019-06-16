@@ -47,9 +47,7 @@ instance CodaLangEnv ERPass CodaVal where
         where
             rmVar resVal = (envL %= M.insert var resVal) >> val
     convert fty val tty = case tty of
-        TypeBundle -> case val of
-            Dict d -> return (Cl (ClMake (M.toList d)))
-            _ -> return (Convert fty val tty)
+        TypeBundle -> return (Convert fty val tty)
         _ -> error "Unable to make new bundle"
     -- dict :: Map Text (m a) -> m a
     dict d = Dict <$> (sequence d)

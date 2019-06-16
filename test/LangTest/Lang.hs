@@ -310,7 +310,8 @@ isValue x = msum [isBundle x, isStr x, showError "isValue" x]
 
 isCMD :: RCOCheck
 isCMD (Cl (Run as)) = sequence_ (isValue <$> as)
-isCMD (Cl (ClCat v)) = msum [isValue v]
+isCMD (Cl (ClCat v)) = isBundle v
+isCMD (Cl cmd@(ClMake _)) = traverse_ isBundle cmd
 isCMD v = showError "isCMD" v
 
 isDir :: RCOCheck
@@ -324,7 +325,7 @@ isLit v = showError "isLit" v
 isConvert :: RCOCheck
 isConvert c@(Convert f v t) = case (f, t) of
   (Just TypeString, TypeBundle) -> msum [isStr v, isVar v, isDir v, err]
-  (Just TypeRecord{}, TypeBundle) -> msum [isVar v, err]
+  (Just TypeRecord{}, TypeBundle) -> err
   (_, TypeRecord{}) -> err
   _ -> isVar v
   where
