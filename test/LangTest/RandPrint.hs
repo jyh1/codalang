@@ -132,12 +132,12 @@ rendCoda :: CodaVal -> RendCoda
 rendCoda cv = case cv of
     Lit u -> entity (RLit u)
     Var v -> entSym v
-    Cl (Run rs) -> entity (Parens1 (RLis rendLis))
+    Cl _ (Run rs) -> entity (Parens1 (RLis rendLis))
         where
             rendRs = rendCoda <$> rs
             rendLis = insertComma sep rendRs
             sep = spaceSymbol ","
-    Cl (ClCat val) -> rendCoda (defConvert val TypeString)
+    Cl _ (ClCat val) -> rendCoda (defConvert val TypeString)
     Str s -> entity (RStr s)
     Dir b ps -> entity (RLis [rendB, dirSep, rendP])
         where

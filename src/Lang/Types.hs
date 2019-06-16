@@ -56,7 +56,7 @@ printAssignForm af = case af of
 -- CodaLang AST
 data CodaVal = Lit UUID
     | Var VarName
-    | Cl CodaCmd
+    | Cl Env CodaCmd
     | Str Text
     | Dir CodaVal Text
     | Let AssignForm CodaVal CodaVal
@@ -64,6 +64,9 @@ data CodaVal = Lit UUID
     | Convert (Maybe CodaType) CodaVal CodaType
     | Dict (Map Text CodaVal)
     deriving (Eq, Ord, Read, Show)
+
+makeCl :: CodaCmd -> CodaVal
+makeCl = Cl []
 
 defConvert :: CodaVal -> CodaType -> CodaVal
 defConvert = Convert Nothing

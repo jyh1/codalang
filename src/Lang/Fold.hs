@@ -21,7 +21,7 @@ class (Monad m) => CodaLangEnv m a where
     lit :: UUID -> m a
     var :: VarName -> m a
     str :: Text -> m a
-    cl :: Cmd (m a) -> m a
+    cl :: Env -> Cmd (m a) -> m a
     dir :: a -> Text -> m a
     clet :: AssignForm -> m a -> m a -> m a
     convert :: (Maybe CodaType) -> a -> CodaType -> m a
@@ -60,9 +60,9 @@ foldCoda :: (CodaLangEnv m a, LocalVar s m b) => CodaVal -> m a
 foldCoda (Lit u  ) = lit u
 foldCoda (Var v  ) = var v
 foldCoda (Str s) = str s
-foldCoda (Cl  cmd) = do
+foldCoda (Cl opts cmd) = do
     let cmdval = fmap foldCoda cmd
-    cl cmdval
+    cl opts cmdval
 foldCoda (Dir bndl sub) = do
     root <- foldCoda bndl
     dir root sub

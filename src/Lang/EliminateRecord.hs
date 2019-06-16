@@ -32,7 +32,7 @@ instance CodaLangEnv ERPass CodaVal where
     lit uuid = return (Lit uuid)
     str t = return (Str t)
     var v = use (envL . at v . to (maybe (Var v) id))
-    cl cmd = Cl <$> (sequence cmd)
+    cl _ cmd = makeCl <$> (sequence cmd)
     dir r p = return $ case r of
         Dict d -> view (at p . to (fromMaybe err)) d
         _ -> Dir r p

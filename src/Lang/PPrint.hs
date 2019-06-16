@@ -83,7 +83,7 @@ instance CodaLangEnv PPPass PPrint where
             errmsg =
                 error ("Undefined variable in PPrint: " ++ T.unpack vn)
     str s = ranno StrAnno (pretty (show s))
-    cl cmd = case cmd of
+    cl _ cmd = case cmd of
         Run cmd -> do
             cs <- sequence cmd
             let cs' = toAnnoDoc <$> cs

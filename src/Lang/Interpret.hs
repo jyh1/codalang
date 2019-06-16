@@ -40,7 +40,7 @@ runCoda cv = case cv of
 
 prepLetRhs :: (Exec m a, Ord a) => Text -> CodaVal -> RunCoda m a
 prepLetRhs vn cv = case cv of
-    Cl (Run cmd) -> do
+    Cl _ (Run cmd) -> do
         prepCmd <- mapM prepCmdEle cmd
         let (depCmd, deps) = unzip prepCmd
             (txtCmd, depRep) = rmDupDep depCmd (concat deps)
@@ -66,10 +66,10 @@ prepLetRhs vn cv = case cv of
                 valVar = M.fromList (swap <$> deps)
                 depToVar dep = fromJust (M.lookup dep valVar)
                 varVal = M.fromList (swap <$> M.toList valVar)
-    Cl (ClCat val) -> do
+    Cl _ (ClCat val) -> do
         valDep <- toDep <$> runCoda val
         lift (clCat vn valDep)
-    Cl (ClMake ks) -> do
+    Cl _ (ClMake ks) -> do
         valKs <- (traverse . _2) (\v -> toDep <$> (runCoda v)) ks
         lift (emptyBundle <$> clMake vn valKs)
     Convert _ val TypeBundle -> do

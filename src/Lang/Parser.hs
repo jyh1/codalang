@@ -44,7 +44,7 @@ fromParseRes res = case res of
     PLet as body -> foldr (uncurry Let)
                           (fromParseRes body)
                           (over (traverse . _2) fromParseRes as)
-    PRun ps   -> Cl (Run (fromParseRes <$> ps))
+    PRun ps   -> makeCl (Run (fromParseRes <$> ps))
     PDir home subs -> foldl' Dir (fromParseRes home) subs
     PConv val ts -> case ts of
         [] -> fromParseRes val

@@ -118,7 +118,7 @@ toVarName :: RCOVal -> RCOPass VarName
 toVarName (RCOLit uuid         ) = bindName (Lit uuid)
 toVarName (RCOStr t) = bindName (Str t)
 toVarName (RCOVar varn         ) = return varn
-toVarName (RCOCmd cmd          ) = bindName (Cl cmd)
+toVarName (RCOCmd cmd          ) = bindName (makeCl cmd)
 toVarName (RCODir bname subdirs) = bindName (fromRCODir bname subdirs)
 toVarName (RCORec m) = bindName (Dict m)
 
@@ -150,9 +150,9 @@ instance CodaLangEnv RCOPass RCORes where
                 (  "The impossible happened: undefined variable in RCO: "
                 ++ T.unpack v
                 )
-    cl (Run cmd) = RCOCmd <$> rcocmd
+    cl _ (Run cmd) = RCOCmd <$> rcocmd
         where rcocmd = Run <$> traverse (>>= toValue) cmd
-    cl (ClCat _) = error "Unexpected cat command in RCO"
+    cl _ (ClCat _) = error "Unexpected cat command in RCO"
     dir val subdir = do
         (newn, path) <- toSubDir val
         return (RCODir newn (path S.|> subdir))
@@ -180,7 +180,7 @@ instance CodaLangEnv RCOPass RCORes where
                         TypeBundle -> do
                             bdRec <-  
                                 mapWithKeyM (\k t -> castFromTo (Dir fval k) t TypeBundle) fdict
-                            makeCmd <- makeVar (Cl (ClMake (M.toList bdRec)))
+                            makeCmd <- makeVar (makeCl (ClMake (M.toList bdRec)))
                             makeVar (Convert Nothing makeCmd TypeBundle)
                         TypeRecord tdict -> do
                             let convRecEle :: Text -> CodaType -> CodaType -> RCOPass Value

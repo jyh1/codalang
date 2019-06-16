@@ -122,7 +122,7 @@ randDir t = do
       return (ty, newN)
 
 randCl :: GenEnv CodaVal
-randCl = Cl <$> randCmd
+randCl = makeCl <$> randCmd
   where
     randCmd :: GenEnv CodaCmd
     randCmd = do
@@ -268,8 +268,8 @@ s = Str
 v :: VarName -> CodaVal
 v = Var
 c :: CodaCmd -> CodaVal
-c = Cl
-r = Cl . Run
+c = makeCl
+r = makeCl . Run
 l = Lit . UUID
 d :: CodaVal -> [Text] -> CodaVal
 d = foldl Dir
@@ -309,9 +309,9 @@ isValue :: RCOCheck
 isValue x = msum [isBundle x, isStr x, showError "isValue" x]
 
 isCMD :: RCOCheck
-isCMD (Cl (Run as)) = sequence_ (isValue <$> as)
-isCMD (Cl (ClCat v)) = isBundle v
-isCMD (Cl cmd@(ClMake _)) = traverse_ isBundle cmd
+isCMD (Cl _ (Run as)) = sequence_ (isValue <$> as)
+isCMD (Cl _ (ClCat v)) = isBundle v
+isCMD (Cl _ cmd@(ClMake _)) = traverse_ isBundle cmd
 isCMD v = showError "isCMD" v
 
 isDir :: RCOCheck
@@ -360,7 +360,7 @@ isERRes :: RCOCheck
 isERRes (Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert]), isERRes body]
   where
     isCMD :: RCOCheck
-    isCMD (Cl cmd) = traverse_ isValue cmd
+    isCMD (Cl _ cmd) = traverse_ isValue cmd
     isCMD v = showError "isCMD" v
     isConvert c@(Convert _ v ty) = case ty of
       TypeString -> isValue v
