@@ -35,7 +35,7 @@ import           Lang.Fold
 
 -- state data type
 type RCOEnvVal = VarName
-data RCOState = RCOState {_counter :: Int, _env :: VarMap RCOEnvVal, _context :: S.Seq Text, _optvar :: VarMap Text}
+data RCOState = RCOState {_counter :: Int, _env :: VarMap RCOEnvVal, _context :: S.Seq Text, _optvar :: VarMap CodaVal}
 makeLenses ''RCOState
 
 
@@ -56,7 +56,7 @@ withLocal v app = do
     context %= (\(most S.:|> _) -> most)
     return val
 
-withOptVar :: Text -> Text -> RCOPass a -> RCOPass a
+withOptVar :: Text -> CodaVal -> RCOPass a -> RCOPass a
 withOptVar opt varres app = do
     oldOpt <- use optvar
     (optvar . at opt) ?= varres
@@ -84,7 +84,7 @@ type NameBindings = S.Seq NameBinding
 type Path = S.Seq Text
 data RCOVal = RCOLit UUID 
     | RCOVar VarName 
-    | RCOCmd Env CmdRCO 
+    | RCOCmd OptEnv CmdRCO 
     | RCODir VarName Path 
     | RCOStr Text
     | RCORec (TextMap Value)
@@ -112,12 +112,15 @@ newTmpName = do
     getName S.Empty = [tmpName]
     getName cs      = toList cs
 
+bindNewName :: CodaVal -> RCOPass VarName
+bindNewName cv = do
+    name <- newTmpName
+    lift (RCO (S.singleton (name, cv)) name)
+
 bindName :: LetRhs -> RCOPass VarName
 bindName cv = case cv of
     Var v -> return v
-    _ -> do
-        name <- newTmpName
-        lift (RCO (S.singleton (name, cv)) name)
+    _ -> bindNewName cv
 
 fromRCODir :: VarName -> Path -> Bundle
 fromRCODir n path = foldl Dir (Var n) path
@@ -136,6 +139,7 @@ toValue (RCODir bname subdirs) = return $ case subdirs of
     _       -> foldl Dir (Var bname) subdirs
 toValue (RCOStr t) = return (Str t)
 toValue rest = Var <$> toVarName rest
+
 
 -- (lit | dir | var)
 -- toLitValue :: RCOVal -> RCOPass Value
@@ -171,7 +175,7 @@ instance CodaLangEnv RCOPass RCORes where
             newns <- withLocal vname (val >>= toVarName)
             withVar vname newns body
         OptionVar vname -> do
-            optval <- val >>= toVarName
+            optval <- val >>= toValue
             withOptVar vname optval body
     convert typeTag val t = do
         optEnv <- use (optvar . to M.toList)

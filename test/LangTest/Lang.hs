@@ -309,9 +309,12 @@ isValue :: RCOCheck
 isValue x = msum [isBundle x, isStr x, showError "isValue" x]
 
 isCMD :: RCOCheck
-isCMD (Cl _ (Run as)) = sequence_ (isValue <$> as)
-isCMD (Cl _ (ClCat v)) = isBundle v
-isCMD (Cl _ cmd@(ClMake _)) = traverse_ isBundle cmd
+isCMD (Cl oe cmd ) = sequence_ [(traverse_ . _2) isValue oe, cmdTest]
+  where 
+    cmdTest = case cmd of
+      Run as -> sequence_ (isValue <$> as)
+      ClCat v -> isBundle v
+      ClMake{} -> traverse_ isBundle cmd
 isCMD v = showError "isCMD" v
 
 isDir :: RCOCheck

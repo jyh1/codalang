@@ -53,10 +53,11 @@ printAssignForm af = case af of
     Variable v -> v
     OptionVar v -> "--" <> v
 
+type OptEnv = [(Text, CodaVal)]
 -- CodaLang AST
 data CodaVal = Lit UUID
     | Var VarName
-    | Cl Env CodaCmd
+    | Cl OptEnv CodaCmd
     | Str Text
     | Dir CodaVal Text
     | Let AssignForm CodaVal CodaVal

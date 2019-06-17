@@ -83,20 +83,23 @@ instance CodaLangEnv PPPass PPrint where
             errmsg =
                 error ("Undefined variable in PPrint: " ++ T.unpack vn)
     str s = ranno StrAnno (pretty (show s))
-    cl _ cmd = case cmd of
-        Run cmd -> do
-            cs <- sequence cmd
-            let cs' = toAnnoDoc <$> cs
-                lpr = flatAlt ("(" <> line <> "  ") "("
-                rpr = (flatAlt (line <> ")") ")")
-                s = ", "
-                runeles = align $ case cs' of
-                    [] -> error "PPrint: empty run command"
-                    [e] -> lpr <> e <> comma <> rpr
-                    _ -> cat (zipWith (<>) (lpr : repeat s) cs') <> rpr
-            ranno RunAnno (group runeles)
-        ClCat val -> val >>= (\v -> convert Nothing v TypeString)
-        ClMake ks -> dict (M.fromList ks) >>= (\v -> convert Nothing v TypeBundle)
+    cl optEnv cmd
+        | not (null optEnv) = 
+            foldr ($) (cl [] cmd) [ clet (OptionVar optVar) (return optVal) | (optVar, optVal) <- optEnv]
+        | otherwise = case cmd of
+            Run cmd -> do
+                cs <- sequence cmd
+                let cs' = toAnnoDoc <$> cs
+                    lpr = flatAlt ("(" <> line <> "  ") "("
+                    rpr = (flatAlt (line <> ")") ")")
+                    s = ", "
+                    runeles = align $ case cs' of
+                        [] -> error "PPrint: empty run command"
+                        [e] -> lpr <> e <> comma <> rpr
+                        _ -> cat (zipWith (<>) (lpr : repeat s) cs') <> rpr
+                ranno RunAnno (group runeles)
+            ClCat val -> val >>= (\v -> convert Nothing v TypeString)
+            ClMake ks -> dict (M.fromList ks) >>= (\v -> convert Nothing v TypeBundle)
     dir bval sub = 
         ranno DirAnno (toAnnoDocWithParen bval <> "/" <> pretty sub)
     clet as val body = do

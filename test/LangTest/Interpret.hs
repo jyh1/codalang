@@ -61,8 +61,7 @@ instance CodaLangEnv InterApp CodaTestRes where
     var v = use (envL . at v . to (fromMaybe errmsg))
         where
             errmsg = error ("Undefined var in test interpreter: " ++ T.unpack v)
-    cl optEnv clcmd = do
-        optVals <- mapM (mapM var) optEnv
+    cl optVals clcmd = do
         cmd <- sequenceA clcmd
         let execcmd = case cmd of
                 Run cmd' -> do
