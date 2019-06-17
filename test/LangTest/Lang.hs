@@ -336,7 +336,7 @@ isConvert c
   | True = showError "isConvert" c
 
 isLet :: RCOCheck
-isLet c@(Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert, isRecord, const (showError "isLet" c)]), isRCO body]
+isLet c@(Let (Variable _) val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert, isRecord, const (showError "isLet" c)]), isRCO body]
 isLet v = showError "isLet" v
 
 isRecord :: RCOCheck
