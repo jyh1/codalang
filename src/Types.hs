@@ -38,7 +38,7 @@ instance HasLogFunc App where
 instance HasProcessContext App where
   processContextL = appProcessContext
 
-data LogEnt = EntVerbatim Text | EntUUID Text | EntParen LogEnt
+data LogEnt = EntVerbatim Text | EntUUID Text | EntParen LogEnt | EntOptEnv (ClInfo Text)
   deriving (Show, Read, Eq)
 escapeVerbatim :: Text -> LogEnt
 escapeVerbatim t = EntVerbatim (T.pack (T.foldr showLitChar "" t))
@@ -65,7 +65,7 @@ instance Exec (RIO App) Text where
     clcmd <- view appClCmd
     execRes <- liftIO (clcmd execCmd)
     resid <- parseUUID execRes
-    appLog (Assign [EntVerbatim vn, EntParen (EntUUID resid)] (escapeVerbatim <$> cmdTxt))
+    appLog (Assign [EntOptEnv vn, EntParen (EntUUID resid)] (escapeVerbatim <$> cmdTxt))
     return resid
    where
     cmdTxt = map fromEle cmd
@@ -76,7 +76,7 @@ instance Exec (RIO App) Text where
     clcmd <- view appClCmd
     res <- liftIO (clcmd execCmd)
     let resText = decodeUtf8Lenient res
-    appLog (Assign [EntVerbatim vn] [EntVerbatim (tshow resText)])
+    appLog (Assign [EntOptEnv vn] [EntVerbatim (tshow resText)])
     return (RuntimeString resText)
     where
       execCmd = ExecCat (fromDeps val)
@@ -84,7 +84,7 @@ instance Exec (RIO App) Text where
     clcmd <- view appClCmd
     let makeCmd = ExecMake (over (traverse . _2) fromDeps ks)
     execRes <- liftIO (clcmd makeCmd) >>= parseUUID
-    appLog (Assign [EntVerbatim vn] [EntUUID execRes])
+    appLog (Assign [EntOptEnv vn] [EntUUID execRes])
     return execRes
 
 fromDeps :: Deps Text -> Text

@@ -119,13 +119,18 @@ data Deps a = Deps a [Text]
 data CMDEle a = Plain Text | BundleRef a [Text]
     deriving (Show, Read, Eq, Functor, Ord)
 
+
 class (Monad m) => Exec m a where
-    clRun :: Text -> Map Text (Deps a) -> [CMDEle Text] -> m a
-    clCat :: Text -> Deps a -> m (RuntimeRes a)
+    clRun :: (ClInfo a) -> Map Text (Deps a) -> [CMDEle Text] -> m a
+    clCat :: (ClInfo a) -> Deps a -> m (RuntimeRes a)
     clLit :: Text -> UUID -> m a
-    clMake :: Text -> [(Text, Deps a)] -> m a
+    clMake :: (ClInfo a) -> [(Text, Deps a)] -> m a
 
 data RuntimeRes a = RuntimeString Text 
     | RuntimeBundle a [Text] 
     | RuntimeRecord [(Text, RuntimeRes a)]
     deriving (Show, Read, Eq, Ord)
+
+data ClInfo a = ClInfo {_codaName :: Text, _clOpt :: [(Text, RuntimeRes a)]}
+    deriving (Show, Read, Eq)
+makeLenses ''ClInfo

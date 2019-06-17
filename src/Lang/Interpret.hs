@@ -40,12 +40,35 @@ runCoda cv = case cv of
 
 prepLetRhs :: (Exec m a, Ord a) => Text -> CodaVal -> RunCoda m a
 prepLetRhs vn cv = case cv of
-    Cl _ (Run cmd) -> do
-        prepCmd <- mapM prepCmdEle cmd
-        let (depCmd, deps) = unzip prepCmd
-            (txtCmd, depRep) = rmDupDep depCmd (concat deps)
-        lift (emptyBundle <$> clRun vn depRep txtCmd)
-      where
+    Cl optEnv clcmd -> do
+        opts <- (traverse . _2) runCoda optEnv
+        let clinfo = ClInfo vn opts
+        case clcmd of
+            Run cmd -> processRun clinfo cmd
+            ClCat val -> do
+                valDep <- toDep <$> runCoda val
+                lift (clCat clinfo valDep)
+            ClMake ks -> do
+                valKs <- (traverse . _2) (\v -> toDep <$> (runCoda v)) ks
+                lift (emptyBundle <$> clMake clinfo valKs)
+    Convert _ val TypeBundle -> do
+        valRes <- runCoda val
+        case valRes of
+            RuntimeString t -> prepLetRhs vn (Lit (BundleName t))
+            RuntimeBundle{} -> return valRes
+            RuntimeRecord{} -> error "Cannot convert record"
+    Dir{} -> runCoda cv
+    Str{} -> runCoda cv
+    Lit u -> lift (emptyBundle <$> clLit vn u)
+    _     -> error "Impossible happened: not RCO expr in let assignment"
+
+processRun :: (Exec m a, Ord a) => ClInfo a -> [CodaVal] -> RunCoda m a
+processRun inf cmd = do
+    prepCmd <- mapM prepCmdEle cmd
+    let (depCmd, deps) = unzip prepCmd
+        (txtCmd, depRep) = rmDupDep depCmd (concat deps)
+    lift (emptyBundle <$> clRun inf depRep txtCmd)
+    where
         prepCmdEle ele = case ele of
             Str t -> return (Plain t, [])
             Var v -> do
@@ -66,24 +89,11 @@ prepLetRhs vn cv = case cv of
                 valVar = M.fromList (swap <$> deps)
                 depToVar dep = fromJust (M.lookup dep valVar)
                 varVal = M.fromList (swap <$> M.toList valVar)
-    Cl _ (ClCat val) -> do
-        valDep <- toDep <$> runCoda val
-        lift (clCat vn valDep)
-    Cl _ (ClMake ks) -> do
-        valKs <- (traverse . _2) (\v -> toDep <$> (runCoda v)) ks
-        lift (emptyBundle <$> clMake vn valKs)
-    Convert _ val TypeBundle -> do
-        valRes <- runCoda val
-        case valRes of
-            RuntimeString t -> prepLetRhs vn (Lit (BundleName t))
-            RuntimeBundle{} -> return valRes
-            RuntimeRecord{} -> error "Cannot convert record"
-    Dir{} -> runCoda cv
-    Str{} -> runCoda cv
-    Lit u -> lift (emptyBundle <$> clLit vn u)
-    _     -> error "Impossible happened: not RCO expr in let assignment"
 
 
+-- optVal <- (traverse . _2) runCoda optEnv
+-- let optInfo = ClInfo vn optVal
+    
 toDep :: RuntimeRes a -> Deps a
 toDep (RuntimeBundle a b) = Deps a b
 toDep _ = error "runtime type error!"

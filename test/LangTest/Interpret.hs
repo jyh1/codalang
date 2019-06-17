@@ -65,10 +65,10 @@ instance CodaLangEnv InterApp CodaTestRes where
         cmd <- sequenceA clcmd
         let execcmd = case cmd of
                 Run cmd' -> do
-                    makeLog (LogRun cmd')
+                    makeLog Nothing (LogRun cmd')
                     RunRes <$> getCounter
-                ClCat val -> runCat val
-                ClMake val -> runMake val
+                ClCat val -> runCat Nothing val
+                ClMake val -> runMake Nothing val
         if null optVals then execcmd else 
             do
                 optionvars .= M.fromList optVals
@@ -93,12 +93,12 @@ instance CodaLangEnv InterApp CodaTestRes where
             makeConvert val vt = case vt of
                 TypeString -> case val of
                     StrRes{} -> return val
-                    _ -> runCat val
+                    _ -> runCat Nothing val
                 TypeBundle -> case val of
                     StrRes s -> return (BunRes (BundleName s))
                     DictRes dict -> do
                         resD <- mapM (`makeConvert` TypeBundle) dict
-                        runMake (M.toList resD)
+                        runMake Nothing (M.toList resD)
                     _ -> return val
                 TypeRecord d -> case val of
                     DictRes vd -> DictRes <$> (sequence $
@@ -128,20 +128,22 @@ makeDir val sub =
         where
             keepDirRes = error "Undefined key in record"
 
-runCatTxt :: CodaTestRes -> InterApp Text
-runCatTxt val = do
-    makeLog (LogCat val)
+-- runCatTxt :: CodaTestRes -> InterApp Text
+runCatTxt opt val = do
+    makeLog opt (LogCat val)
     (("catres" <>) . tshow) <$> getCounter
 
-runCat v = StrRes <$> runCatTxt v
+runCat opt v = StrRes <$> runCatTxt opt v
 
-makeLog cmd = do
-    oe <- use (optionvars . to M.toList)
-    cmdlog %= ((oe, cmd) :)
+makeLog opt cmd = case opt of
+    Nothing -> do
+        oe <- use (optionvars . to M.toList)
+        cmdlog %= ((oe, cmd) :)
+    Just oe -> cmdlog %= ((oe, cmd) :)
 
-runMake :: [(Text, CodaTestRes)] -> InterApp CodaTestRes
-runMake ds = do
-    makeLog (LogMake ds)
+-- runMake :: () -> [(Text, CodaTestRes)] -> InterApp CodaTestRes
+runMake opt ds = do
+    makeLog opt (LogMake ds)
     MakeRes <$> getCounter
 -- return logs of runned command and final result
 type TestInterpret = CodaVal -> ([([(Text, CodaTestRes)], CmdLog CodaTestRes)], CodaTestRes)
@@ -154,9 +156,13 @@ testInterpret cv = (_cmdlog env, res)
         (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
 
 -- use interpret interface (after RCO)
+getOptEnv :: ClInfo CodaTestRes -> [(Text, CodaTestRes)]
+getOptEnv o = over (traverse . _2) (fromRTRes) (_clOpt o)
+    where
+        fromRTRes (RuntimeString t) = StrRes t
 instance Exec InterApp CodaTestRes where
-    clRun _ deps cmd = do
-        cmdlog %= (([], LogRun resCmd) :)
+    clRun opts deps cmd = do
+        cmdlog %= ((getOptEnv opts, LogRun resCmd) :)
         c <- getCounter
         return (RunRes c)
         where
@@ -171,8 +177,8 @@ instance Exec InterApp CodaTestRes where
                             fromDep eleDep ps
                             
     clLit _ u = return (BunRes u)
-    clCat _ v = RuntimeString <$> runCatTxt (fromDep v [])
-    clMake _ ks = runMake (over (traverse . _2) ( `fromDep` []) ks)
+    clCat opts v = RuntimeString <$> runCatTxt (Just (getOptEnv opts)) (fromDep v [])
+    clMake opts ks = runMake (Just (getOptEnv opts)) (over (traverse . _2) ( `fromDep` []) ks)
 
 fromDep (Deps tres depPath) elePath
     | null ps = tres
