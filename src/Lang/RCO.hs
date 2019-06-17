@@ -35,7 +35,7 @@ import           Lang.Fold
 
 -- state data type
 type RCOEnvVal = VarName
-data RCOState = RCOState {_counter :: Int, _env :: VarMap RCOEnvVal, _context :: S.Seq Text}
+data RCOState = RCOState {_counter :: Int, _env :: VarMap RCOEnvVal, _context :: S.Seq Text, _optvar :: VarMap Text}
 makeLenses ''RCOState
 
 
@@ -55,13 +55,21 @@ withLocal v app = do
     val <- app
     context %= (\(most S.:|> _) -> most)
     return val
+
+withOptVar :: Text -> Text -> RCOPass a -> RCOPass a
+withOptVar opt varres app = do
+    oldOpt <- use optvar
+    (optvar . at opt) ?= varres
+    res <- app
+    optvar .= oldOpt
+    return res
 -- lang rco
 runRCO :: CodaVal -> CodaVal
 runRCO cdvl = foldr (\(k,v) -> (Let (Variable k) v)) bndl binds
   where
     foldApp :: RCOPass Bundle
     foldApp        = foldCoda cdvl >>= toValue
-    RCO binds bndl = evalStateT foldApp (RCOState 0 mempty mempty)
+    RCO binds bndl = evalStateT foldApp (RCOState 0 mempty mempty mempty)
 
 
 type Bundle = CodaVal
@@ -76,7 +84,7 @@ type NameBindings = S.Seq NameBinding
 type Path = S.Seq Text
 data RCOVal = RCOLit UUID 
     | RCOVar VarName 
-    | RCOCmd CmdRCO 
+    | RCOCmd Env CmdRCO 
     | RCODir VarName Path 
     | RCOStr Text
     | RCORec (TextMap Value)
@@ -118,7 +126,7 @@ toVarName :: RCOVal -> RCOPass VarName
 toVarName (RCOLit uuid         ) = bindName (Lit uuid)
 toVarName (RCOStr t) = bindName (Str t)
 toVarName (RCOVar varn         ) = return varn
-toVarName (RCOCmd cmd          ) = bindName (makeCl cmd)
+toVarName (RCOCmd optEnv cmd   ) = bindName (Cl optEnv cmd)
 toVarName (RCODir bname subdirs) = bindName (fromRCODir bname subdirs)
 toVarName (RCORec m) = bindName (Dict m)
 
@@ -150,18 +158,25 @@ instance CodaLangEnv RCOPass RCORes where
                 (  "The impossible happened: undefined variable in RCO: "
                 ++ T.unpack v
                 )
-    cl _ (Run cmd) = RCOCmd <$> rcocmd
+    cl _ (Run cmd) = do
+        optEnv <- use (optvar . to M.toList)
+        RCOCmd optEnv <$> rcocmd
         where rcocmd = Run <$> traverse (>>= toValue) cmd
-    cl _ (ClCat _) = error "Unexpected cat command in RCO"
     dir val subdir = do
         (newn, path) <- toSubDir val
         return (RCODir newn (path S.|> subdir))
-    clet (Variable vname) val body = do
-        newns <- withLocal vname (val >>= toVarName)
-        withVar vname newns body
+    -- clet (Variable vname) val body = do
+    clet af val body = case af of
+        Variable vname -> do
+            newns <- withLocal vname (val >>= toVarName)
+            withVar vname newns body
+        OptionVar vname -> do
+            optval <- val >>= toVarName
+            withOptVar vname optval body
     convert typeTag val t = do
+        optEnv <- use (optvar . to M.toList)
         cval <- toValue val
-        let catCmd v = return (RCOCmd (ClCat v))
+        let catCmd v = return (RCOCmd optEnv (ClCat v))
             valType = fromMaybe (error "no type tag in RCO convert") typeTag
             makeVar c = Var <$> (bindName c)
             mapWithKeyM f m = sequence (M.mapWithKey f m)
@@ -180,7 +195,7 @@ instance CodaLangEnv RCOPass RCORes where
                         TypeBundle -> do
                             bdRec <-  
                                 mapWithKeyM (\k t -> castFromTo (Dir fval k) t TypeBundle) fdict
-                            makeCmd <- makeVar (makeCl (ClMake (M.toList bdRec)))
+                            makeCmd <- makeVar (Cl optEnv (ClMake (M.toList bdRec)))
                             makeVar (Convert Nothing makeCmd TypeBundle)
                         TypeRecord tdict -> do
                             let convRecEle :: Text -> CodaType -> CodaType -> RCOPass Value

@@ -33,11 +33,11 @@ data CodaTestRes = BunRes UUID
 data CmdLog a = LogRun [a] | LogCat a | LogMake [(Text, a)]
     deriving (Show, Read, Eq, Ord)
 
-type OptionEnv a = [(Text, a)]
+type OptionEnv a = TextMap a
 
 data CodaInterEnv a = CodaInterEnv {
       _envmap :: VarMap a
-    , _cmdlog :: [(OptionEnv a, CmdLog a)]
+    , _cmdlog :: [([(Text, a)], CmdLog a)]
     , _counter :: Int
     , _optionvars :: OptionEnv a
     }
@@ -61,23 +61,31 @@ instance CodaLangEnv InterApp CodaTestRes where
     var v = use (envL . at v . to (fromMaybe errmsg))
         where
             errmsg = error ("Undefined var in test interpreter: " ++ T.unpack v)
-    cl _ clcmd = do
+    cl optEnv clcmd = do
+        optVals <- mapM (mapM var) optEnv
         cmd <- sequenceA clcmd
-        case cmd of
-            Run cmd' -> do
-                makeLog (LogRun cmd')
-                RunRes <$> getCounter
-            ClCat val -> runCat val
-            ClMake val -> runMake val
+        let execcmd = case cmd of
+                Run cmd' -> do
+                    makeLog (LogRun cmd')
+                    RunRes <$> getCounter
+                ClCat val -> runCat val
+                ClMake val -> runMake val
+        if null optVals then execcmd else 
+            do
+                optionvars .= M.fromList optVals
+                res <- execcmd
+                optionvars .= M.empty
+                return res
     dir val sub = return $ makeDir val sub
     clet af val body = do
         valres <- val
         case af of
             Variable varn -> withVar varn valres body
             OptionVar varn -> do
-                optionvars %= ((varn, valres):)
+                origin <- use optionvars
+                optionvars %= (M.insert varn valres)
                 res <- body
-                optionvars %= tail
+                optionvars .= origin
                 return res
         
     convert tt val vt = makeConvert val vt
@@ -129,7 +137,7 @@ runCatTxt val = do
 runCat v = StrRes <$> runCatTxt v
 
 makeLog cmd = do
-    oe <- use optionvars
+    oe <- use (optionvars . to M.toList)
     cmdlog %= ((oe, cmd) :)
 
 runMake :: [(Text, CodaTestRes)] -> InterApp CodaTestRes
@@ -137,14 +145,14 @@ runMake ds = do
     makeLog (LogMake ds)
     MakeRes <$> getCounter
 -- return logs of runned command and final result
-type TestInterpret = CodaVal -> ([(OptionEnv CodaTestRes, CmdLog CodaTestRes)], CodaTestRes)
+type TestInterpret = CodaVal -> ([([(Text, CodaTestRes)], CmdLog CodaTestRes)], CodaTestRes)
 
 testInterpret :: TestInterpret
 testInterpret cv = (_cmdlog env, res)
     where
         app :: InterApp CodaTestRes
         app = foldCoda cv
-        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 []))
+        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
 
 -- use interpret interface (after RCO)
 instance Exec InterApp CodaTestRes where
@@ -184,7 +192,7 @@ testInterpretWIntrfc cv = (_cmdlog env, newRes res)
     where
         app :: InterApp (RuntimeRes CodaTestRes)
         app = evalCoda cv
-        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 []))
+        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
         newRes res = case res of
             RuntimeString t -> StrRes t
             RuntimeBundle m ps -> case (m, ps) of
