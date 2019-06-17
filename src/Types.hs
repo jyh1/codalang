@@ -52,6 +52,7 @@ instance Display LogInfo where
       render (EntVerbatim t) = t
       render (EntUUID u) = T.take 7 u
       render (EntParen e) = T.concat ["(", render e, ")"]
+      render (EntOptEnv e) = render (EntVerbatim (_codaName e))
 
 appLog :: LogInfo -> RIO App ()
 appLog l = logInfo (display l)
@@ -71,7 +72,7 @@ instance Exec (RIO App) Text where
     cmdTxt = map fromEle cmd
     fromDep (Deps u subs) = buildPath (u : subs)
     depTxt  = M.toList (fromDep <$> depMap)
-    execCmd = ExecRun depTxt cmdTxt [ClName vn]
+    execCmd = ExecRun depTxt cmdTxt (consOptionList vn)
   clCat vn val = do
     clcmd <- view appClCmd
     res <- liftIO (clcmd execCmd)
@@ -79,13 +80,18 @@ instance Exec (RIO App) Text where
     appLog (Assign [EntOptEnv vn] [EntVerbatim (tshow resText)])
     return (RuntimeString resText)
     where
-      execCmd = ExecCat (fromDeps val)
+      execCmd = ExecCat (fromDeps val) (consOptionList vn)
   clMake vn ks = do
     clcmd <- view appClCmd
-    let makeCmd = ExecMake (over (traverse . _2) fromDeps ks)
+    let makeCmd = ExecMake (over (traverse . _2) fromDeps ks) (consOptionList vn)
     execRes <- liftIO (clcmd makeCmd) >>= parseUUID
     appLog (Assign [EntOptEnv vn] [EntUUID execRes])
     return execRes
+
+consOptionList :: (ClInfo Text) -> ClOption
+consOptionList (ClInfo vname optList) = ("name", vname) : (over (traverse . _2) extractStr optList)
+  where
+    extractStr (RuntimeString t) = t
 
 fromDeps :: Deps Text -> Text
 fromDeps (Deps r ps) = buildPath (r : ps)

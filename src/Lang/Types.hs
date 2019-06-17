@@ -102,12 +102,11 @@ dictMinus f d1 d2 = M.null (M.differenceWith maybediff d1 d2)
 data CodaResult = ResStr Text | ResBundle UUID
     deriving (Eq, Ord, Read, Show)
 
-data ClOption = ClName Text
-    deriving (Show, Read, Eq)
+type ClOption = [(Text, Text)]
 
-data Execute = ExecRun [(Text, Text)] [Text] [ClOption]
-    | ExecCat Text
-    | ExecMake [(Text, Text)]
+data Execute = ExecRun [(Text, Text)] [Text] ClOption
+    | ExecCat Text ClOption
+    | ExecMake [(Text, Text)] ClOption
     deriving (Show, Read, Eq)
 
 buildPath :: [Text] -> Text

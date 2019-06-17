@@ -5,6 +5,8 @@ module RunCmd(cmdExec) where
 
 import RIO
 import qualified RIO.Text as T
+import qualified RIO.Map as M
+import qualified RIO.Set as S
 import qualified System.Process.Typed as P
 
 import Lang.Lang
@@ -16,15 +18,17 @@ cmdExec exec = case exec of
         where
             (subcmd, cmdstr) = buildRunCmd cmd
             envstr = buildEnv env
-            optArgs = makeOptArgs opts
+            optArgs = makeOptArgs runOptions opts
             process = P.proc "cl" (concat [[subcmd], optArgs, envstr, [cmdstr]])
-    ExecCat v -> do
+    ExecCat v opts -> do
         let vstr = T.unpack v
+            optArgs = makeOptArgs catOptions opts
         P.runProcess_ (P.setStdout P.createPipe (makeProc ["wait", vstr]))
         procStdout (makeProc ["cat", vstr])
-    ExecMake ks -> do
+    ExecMake ks opts -> do
         let cmdstr = buildEnv ks
-        procStdout (makeProc (concat [["make"], cmdstr]))
+            optArgs = makeOptArgs makeOptions opts
+        procStdout (makeProc (concat [["make"], optArgs, cmdstr]))
     where
         procStdout pro = do
             (res, _) <- P.readProcess_ pro
@@ -39,7 +43,27 @@ buildEnv es = envStr <$> es
     where
         envStr (n, e) = T.unpack (T.concat [n, ":", e])
 
-makeOptArgs :: [ClOption] -> [String]
-makeOptArgs = concatMap makeArg
+makeOptArgs :: S.Set Text -> ClOption -> [String]
+makeOptArgs optnames opts = concatMap makeArg (M.toList avaiableOpts)
     where
-        makeArg (ClName t) = ["-n", T.unpack t]
+        avaiableOpts = M.restrictKeys (M.fromList opts) optnames
+        makeArg (name, val) = [T.unpack ("--" <> name), T.unpack val]
+
+runOptions, makeOptions, catOptions :: S.Set Text
+runOptions = S.fromList [
+    "name"
+    , "description"
+    , "tags"
+    , "allow-failed-dependencies"
+    , "request-docker-image"
+    , "request-time"
+    , "request-memory"
+    , "request-disk"
+    , "request-cpus"
+    , "request-gpus"
+    , "request-queue"
+    , "request-priority"
+    , "request-network"
+    ]
+makeOptions = S.fromList ["name"]
+catOptions = S.fromList []
