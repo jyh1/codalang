@@ -26,6 +26,8 @@ class (Monad m) => CodaLangEnv m a where
     clet :: AssignForm -> m a -> m a -> m a
     convert :: (Maybe CodaType) -> a -> CodaType -> m a
     dict :: Map Text (m a) -> m a
+    lambda :: TypeDict -> m a -> m a
+    apply :: a -> a -> m a
 
 -- data type
 type VarMap a = Map VarName a
@@ -49,9 +51,12 @@ class (MonadState s m, HasCounter s) => GetCounter s m where
 
 class (MonadState s m, HasEnv s b) => LocalVar s m b where
     withVar :: VarName -> b -> m a -> m a
-    withVar varn val app = do
-        oldEnv <- use envL
+    withVar varn val app = sandBox $ do
         (envL . at varn) ?= val
+        app
+    sandBox :: m a -> m a
+    sandBox app = do
+        oldEnv <- use envL
         res <- app
         envL .= oldEnv
         return res
@@ -71,3 +76,5 @@ foldCoda (Let varname val body) =
     clet varname (foldCoda val) (foldCoda body)
 foldCoda (Convert domain val rt) = foldCoda val >>= (\v -> convert domain v rt)
 foldCoda (Dict d) = dict (foldCoda <$> d)
+foldCoda (Lambda ad bd) = lambda ad (foldCoda bd)
+foldCoda (Apply f bd) = join (liftA2 apply (foldCoda f) (foldCoda bd))

@@ -64,6 +64,8 @@ data CodaVal = Lit UUID
     -- value targettype fromtype
     | Convert (Maybe CodaType) CodaVal CodaType
     | Dict (Map Text CodaVal)
+    | Lambda TypeDict CodaVal
+    | Apply CodaVal CodaVal
     deriving (Eq, Ord, Read, Show)
 
 makeCl :: CodaCmd -> CodaVal
@@ -77,7 +79,7 @@ tmpName = "codalang"
 
 type TextMap = Map Text
 type TypeDict = TextMap CodaType
-data CodaType = TypeString | TypeBundle | TypeRecord TypeDict
+data CodaType = TypeString | TypeBundle | TypeRecord TypeDict | TypeLam TypeDict CodaType
     deriving (Eq, Ord, Read, Show)
 
 isSubtypeOf :: CodaType -> CodaType -> Bool

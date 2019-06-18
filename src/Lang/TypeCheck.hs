@@ -21,6 +21,8 @@ data TypeErrorInfo = UnDef
     | Mismatch {expected :: CodaType, current :: CodaType}
     | KeyError {usedKey :: Text}
     | TypeCastError {origin :: CodaType, target :: CodaType}
+    | NotFunction CodaType
+    | Incompat {expected :: CodaType, current :: CodaType}
     deriving (Read, Eq, Typeable)
 
 data TypeError = TypeError TypeErrorInfo CodaVal
@@ -128,6 +130,26 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
             torig = resOrig <$> d
             ty = TypeRecord td
         return (TCRes {resType = ty, resVal = Dict tv, resOrig = Dict torig})
+    
+    lambda args body = sandBox $ do
+        let argEnv = M.mapWithKey (\k t -> makeRes t (Var k)) args
+        envL %= M.union argEnv
+        bodyT <- body
+        let lamty = TypeLam args (resType bodyT)
+        return (fmapT lamty (Lambda args) bodyT)
+
+    apply fun arg = case (resType fun) of
+        TypeLam ad rt -> 
+            case argty `isSubtypeOf` funarg of
+                True -> return applyNode
+                _ -> throwErr (TypeError (Incompat funarg argty) (resOrig applyNode))
+            where
+                funarg = TypeRecord ad
+                argty = resType arg
+                applyNode = (liftRes2 Apply fun arg){resType = rt}
+        _ -> throwErr (TypeError (NotFunction (resType fun)) (resOrig fun))
+
+
 
 typeCheck :: CodaVal -> Either Text (CodaType, CodaVal)
 typeCheck cv = case res of
