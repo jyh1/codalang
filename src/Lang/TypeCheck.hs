@@ -110,13 +110,7 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
             OptionVar{} -> 
                 expectType TypeString (resType valRes) (resOrig valRes) >> body
         return (liftRes2 (Let af) valRes bodyRes)
-    convert _ val vt 
-        = case (ty, vt) of
-            (TypeRecord{}, TypeString) -> castErr
-            (TypeString, TypeRecord{}) -> castErr
-            (TypeRecord{}, TypeBundle) -> doConvert
-            (TypeRecord {}, TypeRecord {}) -> bool castErr doConvert isConvertable
-            _ -> doConvert
+    convert _ val vt = bool castErr doConvert isConvertable
         where
             ty = resType val
             ast = resOrig val

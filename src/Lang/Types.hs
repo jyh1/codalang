@@ -85,6 +85,8 @@ data CodaType = TypeString | TypeBundle | TypeRecord TypeDict | TypeLam TypeDict
 isSubtypeOf :: CodaType -> CodaType -> Bool
 isSubtypeOf (TypeRecord d1) (TypeRecord d2) = dictMinus isSubtypeOf d2 d1
 isSubtypeOf TypeBundle (TypeRecord d1) = allOf traverse (TypeBundle `isSubtypeOf`) d1
+isSubtypeOf (TypeLam arg1 body1) (TypeLam arg2 body2) = 
+    (TypeRecord arg2) `isSubtypeOf` (TypeRecord arg1) && body1 `isSubtypeOf` body2
 isSubtypeOf t1 t2 = t1 == t2
 
 convertable :: CodaType -> CodaType -> Bool
