@@ -49,6 +49,9 @@ instance Show TypeError where
             , "to type:"
             ,  tshow t
             ]
+        NotFunction ty -> T.unlines
+            ["Expected function, actual type:", tshow ty, " in: ", astStr]
+        Incompat{} -> T.unlines ["Incompatible function type in: ", astStr]
         where astStr = pprintCoda ast
 
 
