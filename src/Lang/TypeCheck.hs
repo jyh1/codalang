@@ -63,7 +63,7 @@ fmapT :: CodaType -> (a -> b) -> TCRes a -> TCRes b
 fmapT t f res = (fmap f res){resType = t}
 liftRes2 :: (a -> b -> c) -> TCRes a -> TCRes b -> TCRes c
 liftRes2 f (TCRes _ v1 o1) (TCRes t2 v2 o2) = TCRes t2 (f v1 v2) (f o1 o2)
-coSequenceT :: CodaType -> [TCRes a] -> TCRes [a]
+coSequenceT :: (Functor f) => CodaType -> f (TCRes a) -> TCRes (f a)
 coSequenceT t as = TCRes {resType = t, resVal = resVal <$> as, resOrig = resOrig <$> as}
 
 makeRes :: CodaType -> CodaVal -> (TCRes CodaVal)
@@ -142,8 +142,8 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
                 _ -> throwErr (TypeError (Incompat funarg argty) (resOrig applyNode))
             where
                 funarg = TypeRecord ad
-                argty = resType arg
-                applyNode = (liftRes2 Apply fun arg){resType = rt}
+                argty = TypeRecord (resType <$> arg)
+                applyNode = (liftRes2 Apply fun (coSequenceT rt arg))
         _ -> throwErr (TypeError (NotFunction (resType fun)) (resOrig fun))
 
 

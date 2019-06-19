@@ -105,7 +105,7 @@ childDepth f gen = do
 
 halfDepth, decDepth :: GenEnv a -> GenEnv a
 halfDepth = childDepth (`div` 2)
-decDepth = childDepth (\x -> x - 1)
+decDepth = childDepth (\x -> (x - 1) `max` 0)
 
 randDir :: CodaType -> GenEnv CodaVal
 randDir t = do
@@ -187,11 +187,14 @@ generalize t = case t of
   TypeRecord d -> TypeRecord <$> generalizeDic d
   TypeLam dt ret -> liftA2 TypeLam (specializeDic dt) (generalize ret)
   t -> return t
-randValDict :: TypeDict -> GenEnv CodaVal
-randValDict d = 
-  Dict <$> (sequence $ M.fromList 
+randValMap :: TypeDict -> GenEnv (TextMap CodaVal)
+randValMap d = 
+  (sequence $ M.fromList 
     [(k, dec (randTree t)) 
       | ((k, t), dec) <- zip (M.toList d) (decDepth : repeat halfDepth)])
+
+randValDict :: TypeDict -> GenEnv CodaVal
+randValDict dt = Dict <$> randValMap dt
 
 randLam :: TypeDict -> CodaType -> GenEnv CodaVal
 randLam ad ret = sandBox $ do
@@ -203,7 +206,7 @@ randApp :: CodaType -> GenEnv CodaVal
 randApp t = do
   argdic <- lift randTypeDic
   fun <- decDepth (randTree (TypeLam argdic t))
-  argVal <- halfDepth (randTree (TypeRecord argdic))
+  argVal <- halfDepth (randValMap argdic)
   return (Apply fun argVal)
 
 

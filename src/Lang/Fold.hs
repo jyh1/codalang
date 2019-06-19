@@ -27,7 +27,7 @@ class (Monad m) => CodaLangEnv m a where
     convert :: (Maybe CodaType) -> a -> CodaType -> m a
     dict :: Map Text (m a) -> m a
     lambda :: TypeDict -> m a -> m a
-    apply :: a -> a -> m a
+    apply :: a -> TextMap a -> m a
 
 -- data type
 type VarMap a = Map VarName a
@@ -77,4 +77,4 @@ foldCoda (Let varname val body) =
 foldCoda (Convert domain val rt) = foldCoda val >>= (\v -> convert domain v rt)
 foldCoda (Dict d) = dict (foldCoda <$> d)
 foldCoda (Lambda ad bd) = lambda ad (foldCoda bd)
-foldCoda (Apply f bd) = join (liftA2 apply (foldCoda f) (foldCoda bd))
+foldCoda (Apply f bd) = join (liftA2 apply (foldCoda f) (mapM foldCoda bd))

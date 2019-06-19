@@ -63,9 +63,9 @@ data CodaVal = Lit UUID
     | Let AssignForm CodaVal CodaVal
     -- value targettype fromtype
     | Convert (Maybe CodaType) CodaVal CodaType
-    | Dict (Map Text CodaVal)
+    | Dict (TextMap CodaVal)
     | Lambda TypeDict CodaVal
-    | Apply CodaVal CodaVal
+    | Apply CodaVal (TextMap CodaVal)
     deriving (Eq, Ord, Read, Show)
 
 makeCl :: CodaCmd -> CodaVal
