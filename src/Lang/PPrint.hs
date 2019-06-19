@@ -27,7 +27,11 @@ makeLenses ''PPState
 
 type AnnoDoc = Doc Anno
 
-data PPrint = Value AnnoDoc | PLet [AnnoDoc] AnnoDoc | PTypeAnno AnnoDoc
+data PPrint = Value AnnoDoc 
+    | PLet [AnnoDoc] AnnoDoc 
+    | PTypeAnno AnnoDoc 
+    | PApply AnnoDoc AnnoDoc
+    | PLambda AnnoDoc AnnoDoc
     deriving (Show)
 
 type PPPass = StateT PPState Identity
@@ -55,6 +59,8 @@ toAnnoDoc (PLet as body) = annotate LetAnno (hang 4 (sep [defs, body]))
         keyin = keyword "in"
         asdoc = sep (punctuate semi as)
         defs = align (sep [hang 4 (sep [keylet, asdoc]), keyin])
+toAnnoDoc (PApply f a) = f <+> a
+toAnnoDoc (PLambda args body) = args <+> "=>" <+> body
 
 toAnnoDocWithParen :: PPrint -> AnnoDoc
 toAnnoDocWithParen pval = case pval of
@@ -71,6 +77,7 @@ instance (Pretty CodaType) where
     pretty TypeString = "string"
     pretty TypeBundle = "bundle"
     pretty (TypeRecord dict) = dictAnno [ (pretty k, pretty v) | (k, v) <- M.toList dict]
+    pretty (TypeLam f a) = pretty (TypeRecord f) <+> "=>" <+> pretty a
 
 instance CodaLangEnv PPPass PPrint where
     lit u = case u of
@@ -105,17 +112,20 @@ instance CodaLangEnv PPPass PPrint where
     clet as val body = do
         let vn = printAssignForm as
         c <- getCounter
-        valdoc <- toAnnoDoc <$> val
-        let stmt = annotate StmtAnno (hsep [pretty vn, "=", valdoc])
+        valdoc <- val
+        let stmt = case valdoc of
+                PLambda arg ret -> annotate StmtAnno (hsep [pretty vn, arg, "=", ret])
+                _ -> annotate StmtAnno (hsep [pretty vn, "=", toAnnoDoc valdoc])
         bodydoc <- withVar vn c body
         return $ case bodydoc of
-            Value d -> PLet [stmt] d
-            PTypeAnno d -> PLet [stmt] d
             PLet ss d -> PLet (stmt : ss) d
+            _ -> PLet [stmt] (toAnnoDoc bodydoc)
     convert _ val ct = return (PTypeAnno (annotate TypeAnno (align (toAnnoDocWithParen val <+> "as" <+> pretty ct))))
     dict d = do
         dres <- sequence d
         return (Value (dictAnno [ (pretty k, toAnnoDoc v) | (k, v) <- M.toList dres]))
+    lambda ad body = PLambda (pretty (TypeRecord ad)) <$> (toAnnoDoc <$> body)
+    apply f arg = return (PApply (toAnnoDocWithParen f) (toAnnoDoc arg))
 
 codaToDoc :: CodaVal -> AnnoDoc
 codaToDoc cv = toAnnoDoc res
