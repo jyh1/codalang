@@ -91,7 +91,12 @@ randLeaf c = genLeaf c (constLeaf c)
       TypeString -> [lift (Str <$> randStr)]
         where
           randStr = T.pack <$> (resize 5 (listOf arbitraryASCIIChar))
-      TypeLam td ret -> [Lambda td <$> sandBox (envL %= M.union td >> randLeaf ret)]
+      TypeLam td ret -> [
+        do
+          newN <- randVar
+          fun <- Lambda td <$> sandBox (envL %= M.union td >> randLeaf ret)
+          return (Let (Variable newN) fun (Var newN))
+        ]
       
 
 -- non-leaf node
@@ -140,7 +145,7 @@ randLet t = do
   varName <- lift randAssign
   let bodyGen = case varName of
         Variable var -> do
-          (vt, val) <- halfDepth randCodaVal
+          (vt, val) <- halfDepth (oneofGenEnv [randCodaVal, randLam])
           body <- withVar var vt (randTree t)
           return (val, body)
         _ -> do
@@ -196,11 +201,13 @@ randValMap d =
 randValDict :: TypeDict -> GenEnv CodaVal
 randValDict dt = Dict <$> randValMap dt
 
-randLam :: TypeDict -> CodaType -> GenEnv CodaVal
-randLam ad ret = sandBox $ do
+randLam :: GenEnv (CodaType, CodaVal)
+randLam = sandBox $ do
+  ad <- lift randTypeDic 
+  ret <- lift randType
   envL %= M.union ad
   body <- decDepth $ randTree ret
-  return (Lambda ad body)
+  return (TypeLam ad ret, Lambda ad body)
 
 randApp :: CodaType -> GenEnv CodaVal
 randApp t = do
@@ -235,7 +242,7 @@ randTree t = do
     randString :: GenEnv CodaVal
     randString = oneofGenEnv [randLet TypeString, randConvert TypeString, randDir TypeString, randApp t]
     randLambda :: TypeDict -> CodaType -> GenEnv CodaVal
-    randLambda dt ret = oneofGenEnv [randLet t, randConvert t, randDir t, randLam dt ret, randApp t]
+    randLambda dt ret = oneofGenEnv [randLet t, randConvert t, randDir t, randApp t]
         where
           t = TypeLam dt ret
 

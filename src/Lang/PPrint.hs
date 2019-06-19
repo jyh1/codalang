@@ -59,7 +59,7 @@ toAnnoDoc (PLet as body) = annotate LetAnno (hang 4 (sep [defs, body]))
         keyin = keyword "in"
         asdoc = sep (punctuate semi as)
         defs = align (sep [hang 4 (sep [keylet, asdoc]), keyin])
-toAnnoDoc (PApply f a) = f <+> a
+toAnnoDoc (PApply f a) = f <> a
 toAnnoDoc (PLambda args body) = args <+> "=>" <+> body
 
 toAnnoDocWithParen :: PPrint -> AnnoDoc
@@ -67,17 +67,24 @@ toAnnoDocWithParen pval = case pval of
     Value{} -> toAnnoDoc pval
     _ -> parens (toAnnoDoc pval)
 
-dictAnno :: [(Doc ann, Doc ann)] -> Doc ann
--- dictAnno ads = group (align $ encloseSep (flatAlt ("{" <> line) "{") (flatAlt (line <> "}") "}") ", " dicLis)
-dictAnno ads = group (align $ encloseSep (flatAlt ("{" <> line <> "  ") "{") (flatAlt (line <> "}") "}") ", " dicLis)
+objectAnno :: Doc ann -> Doc ann -> [(Doc ann, Doc ann)] -> Doc ann
+objectAnno op cl ads = group (align $ encloseSep (flatAlt (op <> line <> "  ") op) (flatAlt (line <> cl) cl) ", " dicLis)
     where 
         dicLis = [hang 4 (k <> ":" <+> v) | (k, v) <- ads]
+
+dictAnno, argAnno :: [(Doc ann, Doc ann)] -> Doc ann
+dictAnno = objectAnno "{" "}"
+argAnno = objectAnno "[" "]"
+
+textMap :: TextMap (Doc ann) -> [(Doc ann, Doc ann)]
+textMap m =  [(pretty k, v) | (k, v) <- M.toList m]
 
 instance (Pretty CodaType) where
     pretty TypeString = "string"
     pretty TypeBundle = "bundle"
-    pretty (TypeRecord dict) = dictAnno [ (pretty k, pretty v) | (k, v) <- M.toList dict]
-    pretty (TypeLam f a) = pretty (TypeRecord f) <+> "=>" <+> pretty a
+    pretty (TypeRecord dict) = dictAnno (textMap (pretty <$> dict))
+    pretty (TypeLam f a) = 
+        argAnno (textMap (pretty <$> f)) <+> "=>" <+> pretty a
 
 instance CodaLangEnv PPPass PPrint where
     lit u = case u of
@@ -114,7 +121,7 @@ instance CodaLangEnv PPPass PPrint where
         c <- getCounter
         valdoc <- val
         let stmt = case valdoc of
-                PLambda arg ret -> annotate StmtAnno (hsep [pretty vn, arg, "=", ret])
+                PLambda arg ret -> annotate StmtAnno (hsep [pretty vn <> arg, "=", ret])
                 _ -> annotate StmtAnno (hsep [pretty vn, "=", toAnnoDoc valdoc])
         bodydoc <- withVar vn c body
         return $ case bodydoc of
@@ -123,9 +130,10 @@ instance CodaLangEnv PPPass PPrint where
     convert _ val ct = return (PTypeAnno (annotate TypeAnno (align (toAnnoDocWithParen val <+> "as" <+> pretty ct))))
     dict d = do
         dres <- sequence d
-        return (Value (dictAnno [ (pretty k, toAnnoDoc v) | (k, v) <- M.toList dres]))
-    lambda ad body = PLambda (pretty (TypeRecord ad)) <$> (toAnnoDoc <$> body)
-    apply f arg = return (PApply (toAnnoDocWithParen f) (toAnnoDoc arg))
+        return (Value (dictAnno (textMap (toAnnoDoc <$> dres))))
+    lambda ad body = PLambda (argAnno (textMap (pretty <$> ad))) <$> (toAnnoDoc <$> body)
+    apply f arg = 
+        return (PApply (toAnnoDocWithParen f) (argAnno (textMap (toAnnoDoc <$> arg))))
 
 codaToDoc :: CodaVal -> AnnoDoc
 codaToDoc cv = toAnnoDoc res
