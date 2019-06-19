@@ -131,7 +131,7 @@ instance CodaLangEnv PPPass PPrint where
     dict d = do
         dres <- sequence d
         return (Value (dictAnno (textMap (toAnnoDoc <$> dres))))
-    lambda ad body = PLambda (argAnno (textMap (pretty <$> ad))) <$> (toAnnoDoc <$> body)
+    lambda ad body = PLambda (argAnno (textMap (pretty <$> ad))) <$> (toAnnoDoc <$> foldCoda body)
     apply f arg = 
         return (PApply (toAnnoDocWithParen f) (argAnno (textMap (toAnnoDoc <$> arg))))
 

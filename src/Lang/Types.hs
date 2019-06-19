@@ -95,7 +95,11 @@ convertable t1 t2
     | otherwise = case (t1, t2) of
         (TypeRecord{}, TypeString) -> False
         (TypeString, TypeRecord{}) -> False
+        (TypeLam{}, _) -> False
+        (_, TypeLam{}) -> False
         (TypeRecord d1, TypeRecord d2) -> dictMinus convertable d2 d1
+        (TypeBundle, TypeRecord d) -> allOf traverse (TypeBundle `convertable`) d
+        (TypeRecord d, TypeBundle) -> allOf traverse (`convertable` TypeBundle) d
         _ -> True
 
 dictMinus :: (a -> a -> Bool) -> TextMap a -> TextMap a -> Bool

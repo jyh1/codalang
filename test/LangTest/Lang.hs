@@ -80,7 +80,7 @@ randLeaf c = genLeaf c (constLeaf c)
     genLeaf :: CodaType -> [GenEnv CodaVal] -> GenEnv CodaVal
     genLeaf t others = do
       gm <- use envL
-      let vs = [v | (v, t') <- M.toList gm, t' `isSubtypeOf` t]
+      let vs = [v | (v, t') <- M.toList gm, t' == t]
       case vs of
         [] -> oneofGenEnv others
         _ -> oneofGenEnv ((lift (Var <$> elements vs)) : others)
@@ -167,20 +167,17 @@ randConvert t = do
           where
             extendType t = case t of
               TypeString -> elements [TypeString, TypeBundle]
-              TypeBundle -> suchThat randType notLambda
-                where
-                  notLambda TypeLam{} = False
-                  notLambda _ = True
-              TypeRecord d -> oneof [pure TypeBundle, TypeRecord <$> liftA2 M.union (mapM extendType d) randTypeDic]
-              TypeLam{} -> specialize t
+              TypeBundle -> randNoTypeLam
+              TypeRecord d -> oneof (bool [] [pure TypeBundle] (notLambda t) ++ [TypeRecord <$> mapM extendType d])
+              TypeLam{} -> return t
   newt <- lift genType
   val <- decDepth (randTree newt)
   return (defConvert val t)
 
 specialize :: CodaType -> Gen CodaType
 specialize t = case t of
-  TypeRecord d -> TypeRecord <$> specializeDic d
-  TypeLam dt ret -> liftA2 TypeLam (generalizeDic dt) (specialize ret)
+  TypeRecord d -> TypeRecord <$> return d
+  TypeLam dt ret -> liftA2 TypeLam (return dt) (return ret)
   t -> return t
 generalizeDic, specializeDic :: TypeDict -> Gen TypeDict
 generalizeDic dt = newdic >>= (mapM generalize)
@@ -259,6 +256,12 @@ randDicKey = frequency ((1, randVarName) : [(2, pure ("key" <> tshow i)) | i <- 
 randDicEle = liftA2 (curry id) randDicKey randType
 randTypeDic = M.fromList <$> (resize 3 (listOf randDicEle))
 
+randNoTypeLam :: Gen CodaType
+randNoTypeLam = suchThat randType notLambda
+notLambda :: CodaType -> Bool
+notLambda TypeLam{} = False
+notLambda (TypeRecord dt) = allOf traverse notLambda dt
+notLambda _ = True
 
 randCodaVal :: GenEnv (CodaType, CodaVal)
 randCodaVal = do
@@ -267,7 +270,12 @@ randCodaVal = do
   return (t, val)
 
 randoCodaValWithDep :: Int -> Gen (CodaType, CodaVal)
-randoCodaValWithDep dep = evalStateT randCodaVal (VarEnv mempty (min 15 dep))
+randoCodaValWithDep dep = evalStateT randCodaTest (VarEnv mempty (min 15 dep))
+  where
+    randCodaTest = do
+      t <- lift randNoTypeLam
+      val <- randTree t
+      return (t, val)
 
 data RandCoda = RandCoda CodaType CodaVal
     deriving (Show, Read, Eq)
@@ -446,6 +454,7 @@ checkInterpretRes (l1s, r1) (l2s, r2) =
       dictMinus (flip checkRes) d1 d2
     checkRes (DictRes d1) newval =
       and [checkRes v (makeDir newval k) |(k, v) <- M.toList d1]
+    checkRes (ResLam{}) (ResLam{}) = True
     checkRes res1 res2 = res1 == res2
 
 testParse :: String -> Maybe CodaVal

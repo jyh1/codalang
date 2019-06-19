@@ -28,6 +28,7 @@ data CodaTestRes = BunRes UUID
     | StrRes Text 
     | DictRes (Map Text CodaTestRes)
     | MakeRes Int
+    | ResLam TypeDict (TextMap CodaTestRes) CodaVal
     deriving (Show, Read, Eq, Ord)
 
 data CmdLog a = LogRun [a] | LogCat a | LogMake [(Text, a)]
@@ -110,6 +111,7 @@ instance CodaLangEnv InterApp CodaTestRes where
                             TypeString -> True
                             TypeBundle -> False
                             TypeRecord d -> anyOf traverse hasTypeString d
+                rest -> return val
             -- softConvert :: CodaTestRes -> CodaType -> CodaTestRes
             -- softConvert res ty = case ty of
             --     TypeString -> res
@@ -118,6 +120,16 @@ instance CodaLangEnv InterApp CodaTestRes where
             --         DictRes dr -> DictRes (M.intersectionWith softConvert dr dt)
             --         _ -> DictRes (M.mapWithKey (\k ty -> softConvert (makeDir res k) ty) dt)
     dict dm = DictRes <$> (sequence dm)
+
+    lambda args body = do
+        clo <- use envL
+        return (ResLam args clo body)
+    apply f args = sandBox $ do
+        case f of
+            ResLam argType clo body -> do
+                envL .= M.union (M.intersection args argType) clo
+                foldCoda body
+            _ -> error (show f)
 
 makeDir :: CodaTestRes -> Text -> CodaTestRes
 makeDir val sub =

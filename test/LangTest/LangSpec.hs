@@ -92,9 +92,9 @@ pprintSpec = describe "pretty-printer test" $ do
 typeCheckSpec :: Spec
 typeCheckSpec = describe "type-checker test" $ do
     it "pass type check in random generated ast" $ property $
-        (\(RandCoda ct cv) -> (testTypeCheck cv) `typeCompat` ct)
-    -- it "same results of new AST" $ property $
-    --     (\(RandCoda _ cv) -> checkInterpretRes (dummyInterpret cv) (dummyInterpret (testTypeCheckVal cv)))
+        quickCheckWith stdArgs{ maxSuccess = 300 } (\(RandCoda ct cv) -> (testTypeCheck cv) `shouldBe` ct)
+    it "same results of new AST" $ property $
+        (\(RandCoda _ cv) -> checkInterpretRes (dummyInterpret cv) (dummyInterpret (testTypeCheckVal cv)))
 
 rcoSpec :: Spec
 rcoSpec = describe "RCO(remove_complex_operation)" $ do

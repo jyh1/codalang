@@ -131,7 +131,7 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
     lambda args body = sandBox $ do
         let argEnv = M.mapWithKey (\k t -> makeRes t (Var k)) args
         envL %= M.union argEnv
-        bodyT <- body
+        bodyT <- foldCoda body
         let lamty = TypeLam args (resType bodyT)
         return (fmapT lamty (Lambda args) bodyT)
 
