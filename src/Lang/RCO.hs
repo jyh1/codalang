@@ -33,9 +33,47 @@ import           RIO.List                       ( foldl )
 import           Lang.Types
 import           Lang.Fold
 
+
+type Bundle = CodaVal
+type Value = CodaVal
+type CmdRCO = Cmd RCOVal
+
+-- cmdRCO | dirRCO | Lit id
+type LetRhs = CodaVal
+
+type NameBinding = (Text, LetRhs)
+type NameBindings = S.Seq NameBinding
+type Path = S.Seq Text
+type RCOValMap = TextMap RCOVal
+data RCOVal = RCOLit UUID 
+    | RCOBundle VarName
+    | RCOVar VarName 
+    | RCOCmd [(Text, RCOVal)] CmdRCO
+    | RCODir VarName Path 
+    | RCOStr Text
+    | RCORec RCOValMap
+    | RCOFun TypeDict (VarMap RCOEnvVal) CodaVal
+    deriving (Show)
+data RCO a = RCO NameBindings a
+    deriving (Show, Eq, Read, Functor)
+instance (Applicative RCO) where
+    pure = RCO mempty
+    liftA2 f (RCO n1 a1) (RCO n2 a2) = RCO (n1 <> n2) (f a1 a2)
+instance (Monad RCO) where
+    (RCO n1 a1) >>= f = case f a1 of
+        RCO n2 a2 -> RCO (n1 <> n2) a2
+
+type RCORes = RCOVal
+
 -- state data type
-type RCOEnvVal = VarName
-data RCOState = RCOState {_counter :: Int, _env :: VarMap RCOEnvVal, _context :: S.Seq Text, _optvar :: VarMap CodaVal}
+type RCOEnvVal = RCOVal
+data RCOState = RCOState {
+    _counter :: Int
+    , _env :: VarMap RCOEnvVal
+    , _context :: S.Seq Text
+    , _optvar :: RCOValMap
+    , _newvarenv :: RCOValMap
+    }
 makeLenses ''RCOState
 
 
@@ -47,7 +85,7 @@ instance HasEnv RCOState RCOEnvVal where
 
 instance (Monad m) => GetCounter RCOState (StateT RCOState m)
 
-instance LocalVar RCOState RCOPass Text
+instance LocalVar RCOState RCOPass RCOVal
 
 withLocal :: Text -> RCOPass a -> RCOPass a
 withLocal v app = do
@@ -56,7 +94,7 @@ withLocal v app = do
     context %= (\(most S.:|> _) -> most)
     return val
 
-withOptVar :: Text -> CodaVal -> RCOPass a -> RCOPass a
+withOptVar :: Text -> RCOVal -> RCOPass a -> RCOPass a
 withOptVar opt varres app = do
     oldOpt <- use optvar
     (optvar . at opt) ?= varres
@@ -68,36 +106,8 @@ runRCO :: CodaVal -> CodaVal
 runRCO cdvl = foldr (\(k,v) -> (Let (Variable k) v)) bndl binds
   where
     foldApp :: RCOPass Bundle
-    foldApp        = foldCoda cdvl >>= toValue
-    RCO binds bndl = evalStateT foldApp (RCOState 0 mempty mempty mempty)
-
-
-type Bundle = CodaVal
-type Value = CodaVal
-type CmdRCO = Cmd Bundle
-
--- cmdRCO | dirRCO | Lit id
-type LetRhs = CodaVal
-
-type NameBinding = (Text, LetRhs)
-type NameBindings = S.Seq NameBinding
-type Path = S.Seq Text
-data RCOVal = RCOLit UUID 
-    | RCOVar VarName 
-    | RCOCmd OptEnv CmdRCO 
-    | RCODir VarName Path 
-    | RCOStr Text
-    | RCORec (TextMap Value)
-data RCO a = RCO NameBindings a
-    deriving (Show, Eq, Read, Functor)
-instance (Applicative RCO) where
-    pure = RCO mempty
-    liftA2 f (RCO n1 a1) (RCO n2 a2) = RCO (n1 S.>< n2) (f a1 a2)
-instance (Monad RCO) where
-    (RCO n1 a1) >>= f = case f a1 of
-        RCO n2 a2 -> RCO (n1 S.>< n2) a2
-
-type RCORes = RCOVal
+    foldApp        = foldCoda cdvl >>= rcoValue >>= toRetVal
+    RCO binds bndl = evalStateT foldApp (RCOState 0 mempty mempty mempty mempty)
 
 type RCOPass = StateT RCOState RCO
 
@@ -112,50 +122,96 @@ newTmpName = do
     getName S.Empty = [tmpName]
     getName cs      = toList cs
 
-bindNewName :: CodaVal -> RCOPass VarName
+bindNewName :: RCOVal -> RCOPass VarName
 bindNewName cv = do
     name <- newTmpName
-    lift (RCO (S.singleton (name, cv)) name)
+    newvarenv . at name ?= cv
+    return name
 
-bindName :: LetRhs -> RCOPass VarName
+bindName :: RCOVal -> RCOPass VarName
 bindName cv = case cv of
-    Var v -> return v
+    RCOVar v -> return v
     _ -> bindNewName cv
 
 fromRCODir :: VarName -> Path -> Bundle
 fromRCODir n path = foldl Dir (Var n) path
 
-toVarName :: RCOVal -> RCOPass VarName
-toVarName (RCOLit uuid         ) = bindName (Lit uuid)
-toVarName (RCOStr t) = bindName (Str t)
-toVarName (RCOVar varn         ) = return varn
-toVarName (RCOCmd optEnv cmd   ) = bindName (Cl optEnv cmd)
-toVarName (RCODir bname subdirs) = bindName (fromRCODir bname subdirs)
-toVarName (RCORec m) = bindName (Dict m)
-
-toValue :: RCOVal -> RCOPass Value
-toValue (RCODir bname subdirs) = return $ case subdirs of
-    S.Empty -> Var bname
-    _       -> foldl Dir (Var bname) subdirs
-toValue (RCOStr t) = return (Str t)
-toValue rest = Var <$> toVarName rest
+evalRCO :: RCOVal -> RCOPass VarName
+evalRCO rcoval = case rcoval of
+    RCOVar varn -> return varn
+    RCOLit{} -> register
+    RCOStr{} -> register
+    RCOCmd{} -> register
+    RCODir{} -> register
+    _ -> error (show rcoval)
+    where
+        register = bindName rcoval
 
 
--- (lit | dir | var)
--- toLitValue :: RCOVal -> RCOPass Value
--- toLitValue (RCOLit u) = return (Lit u)
--- toLitValue val = toValue val
+toRetVal :: RCOVal -> RCOPass Value
+toRetVal (RCORec dt) = Dict <$> mapM toRetVal dt
+toRetVal (RCOFun ad clo body) = sandBox $ do
+    envL .= M.union (M.mapWithKey (\k _ -> RCOVar k) ad) clo
+    bdv <- foldCoda body >>= toRetVal
+    return (Lambda ad bdv) 
+toRetVal (RCODir bname subdirs) = do
+    _ <- toRetVal (RCOVar bname)
+    return $ case subdirs of
+        S.Empty -> Var bname
+        _       -> foldl Dir (Var bname) subdirs
+toRetVal (RCOStr t) = return (Str t)
+toRetVal (RCOLit uuid) = return (Lit uuid)
+toRetVal (RCOBundle v) = do
+    _ <- toRetVal (RCOVar v)
+    return (Convert Nothing (Var v) TypeBundle)
+toRetVal (RCOVar varn) = do
+    val <- use (newvarenv . at varn)
+    let load v = do
+            newvarenv . at varn .= Nothing
+            codaval <- toRetVal v
+            lift (RCO (S.singleton (varn, codaval)) (Var varn))
+    maybe (return (Var varn)) load val
+toRetVal (RCOCmd optEnv cmd) = do
+    cmdVal <- mapM toRetVal cmd
+    codaEnv <- (traverse . _2) toRetVal optEnv
+    return (Cl codaEnv cmdVal)
 
-toSubDir :: RCOVal -> RCOPass (VarName, Path)
-toSubDir (RCODir bname subdirs) = return (bname, subdirs)
-toSubDir rest                   = do
-    newn <- toVarName rest
-    return (newn, Empty)
+rcoValue :: RCOVal -> RCOPass RCOVal
+rcoValue v = case v of
+    RCOCmd{} -> doEval
+    RCOLit{} -> doEval
+    RCODir{} -> noChange
+    RCORec{} -> noChange
+    RCOStr{} -> noChange
+    RCOVar{} -> noChange
+    RCOFun{} -> noChange
+    RCOBundle{} -> error "illegal value" 
+    where
+        doEval = RCOVar <$> evalRCO v
+        noChange = return v
+
+rcoLet :: RCOVal -> RCOPass RCOVal
+rcoLet v = case v of
+    RCODir{} -> RCOVar <$> evalRCO v
+    _ -> rcoValue v
+
+toSubDir :: RCOVal -> Text -> RCOPass RCOVal
+toSubDir arg p = case arg of
+    RCODir bname subdirs -> return (RCODir bname (subdirs S.|> p))
+    RCORec td -> return (fromMaybe undefined (M.lookup p td))
+    RCOLit{} -> newSub
+    RCOVar{} -> newSub
+    RCOCmd{} -> newSub
+    _ -> error "Illegal dir"
+    where
+        newSub = do
+            newn <- evalRCO arg
+            return (RCODir newn (S.singleton p))
 
 instance CodaLangEnv RCOPass RCORes where
     lit uuid = return (RCOLit uuid)
     str t = return (RCOStr t)
-    var v = use (envL . at v . to (RCOVar . fromMaybe errmsg))
+    var v = use (envL . at v . to (fromMaybe errmsg))
       where
         errmsg =
             error
@@ -165,59 +221,66 @@ instance CodaLangEnv RCOPass RCORes where
     cl _ (Run cmd) = do
         optEnv <- use (optvar . to M.toList)
         RCOCmd optEnv <$> rcocmd
-        where rcocmd = Run <$> traverse (>>= toValue) cmd
-    dir val subdir = do
-        (newn, path) <- toSubDir val
-        return (RCODir newn (path S.|> subdir))
-    -- clet (Variable vname) val body = do
+        where rcocmd = Run <$> traverse (>>= rcoValue) cmd
+    dir val subdir = toSubDir val subdir
     clet af val body = case af of
         Variable vname -> do
-            newns <- withLocal vname (val >>= toVarName)
+            newns <- withLocal vname (val >>= rcoLet)
             withVar vname newns body
         OptionVar vname -> do
-            optval <- val >>= toValue
+            optval <- val >>= rcoValue
             withOptVar vname optval body
     convert typeTag val t = do
         optEnv <- use (optvar . to M.toList)
-        cval <- toValue val
-        let catCmd v = return (RCOCmd optEnv (ClCat v))
+        let catCmd v = RCOCmd optEnv (ClCat v)
             valType = fromMaybe (error "no type tag in RCO convert") typeTag
             makeVar c = Var <$> (bindName c)
             mapWithKeyM f m = sequence (M.mapWithKey f m)
-            castFromTo :: Value -> CodaType -> CodaType -> RCOPass Value
+            castFromTo :: RCOVal -> CodaType -> CodaType -> RCOPass RCOVal
             castFromTo fval fty tty 
                 | fty `isSubtypeOf` tty = return fval
                 | otherwise = case fty of
                     TypeBundle -> case tty of
-                        TypeString -> catCmd fval >>= toValue
-                        TypeRecord dt -> do
-                            rcd <- Dict <$> 
-                                mapWithKeyM (\ k t -> castBundle (Dir fval k) t) dt
-                            makeVar rcd
+                        TypeString -> catCmd <$> rcoValue fval
+                        TypeRecord dt ->
+                            RCORec <$> 
+                                mapWithKeyM (\ k t -> (dir fval k) >>= ( `castBundle` t) >>= rcoValue) dt
                         TypeBundle -> return fval
                     TypeRecord fdict -> case tty of
                         TypeBundle -> do
-                            bdRec <-  
-                                mapWithKeyM (\k t -> castFromTo (Dir fval k) t TypeBundle) fdict
-                            makeCmd <- makeVar (Cl optEnv (ClMake (M.toList bdRec)))
-                            makeVar (Convert Nothing makeCmd TypeBundle)
+                            let castKeyT k t = do
+                                dirres <- dir fval k
+                                castFromTo dirres t TypeBundle >>= rcoValue
+                            bdRec <- mapWithKeyM castKeyT fdict
+                            return (RCOCmd optEnv (ClMake (M.toList bdRec)))
                         TypeRecord tdict -> do
-                            let convRecEle :: Text -> CodaType -> CodaType -> RCOPass Value
-                                convRecEle k ft tt = 
-                                    castFromTo (Dir fval k) ft tt
-                            proRec <- Dict <$> sequence (M.intersectionWithKey convRecEle fdict tdict)
-                            makeVar proRec
+                            let convRecEle :: Text -> CodaType -> CodaType -> RCOPass RCOVal
+                                convRecEle k ft tt = do
+                                    dirres <- dir fval k
+                                    castFromTo dirres ft tt >>= rcoValue
+                            RCORec <$> sequence (M.intersectionWithKey convRecEle fdict tdict)
                         TypeString -> error "RCO: convert record to string"           
                     TypeString -> case tty of
-                        TypeBundle -> makeVar (Convert (Just fty) fval tty)
+                        TypeBundle -> do
+                            fcoda <- rcoValue fval >>= bindName
+                            RCOVar <$> bindName (RCOBundle fcoda)
                         TypeString -> return fval
                         TypeRecord{} -> error "RCO: convert string to record"
             castBundle bd ty = case ty of
                 TypeBundle -> return bd
                 _ -> castFromTo bd TypeBundle ty
-        RCOVar <$> (castFromTo cval valType t >>= bindName)
+        castFromTo val valType t
 
-
-
-    dict rs =
-        RCORec <$> traverse (>>= toValue) rs
+    dict rs = do
+        rsv <- sequence rs
+        RCORec <$> mapM rcoLet rsv
+    
+    lambda arg body = do
+        clo <- use envL
+        return (RCOFun arg clo body)
+    
+    apply f argval = case f of
+        RCOFun argdict clo body -> sandBox $ do
+            envL .= M.union (M.intersection argval argdict) clo
+            foldCoda body
+        _ -> error "applying non function"
