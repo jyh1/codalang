@@ -449,13 +449,13 @@ dummyInterpretWIntfrc = testInterpretWIntrfc
 checkInterpretRes :: (Eq a) => (a, CodaTestRes) ->  (a, CodaTestRes) -> Bool
 checkInterpretRes (l1s, r1) (l2s, r2) = 
   l1s == l2s && checkRes r1 r2
-  where
-    checkRes (DictRes d1) (DictRes d2) = 
-      dictMinus (flip checkRes) d1 d2
-    checkRes (DictRes d1) newval =
-      and [checkRes v (makeDir newval k) |(k, v) <- M.toList d1]
-    checkRes (ResLam{}) (ResLam{}) = True
-    checkRes res1 res2 = res1 == res2
+
+checkRes (DictRes d1) (DictRes d2) = 
+  dictMinus (flip checkRes) d1 d2
+checkRes (DictRes d1) newval =
+  and [checkRes v (makeDir newval k) |(k, v) <- M.toList d1]
+checkRes (ResLam{}) (ResLam{}) = True
+checkRes res1 res2 = res1 == res2
 
 testParse :: String -> Maybe CodaVal
 testParse = loadString

@@ -23,11 +23,11 @@ import Lang.Fold
 import Lang.Interpret
 
 data CodaTestRes = BunRes UUID 
-    | RunRes Int 
+    | RunRes [(Text, CodaTestRes)] [CodaTestRes] 
     | DirRes CodaTestRes [Text] 
     | StrRes Text 
     | DictRes (Map Text CodaTestRes)
-    | MakeRes Int
+    | MakeRes [(Text, CodaTestRes)] [(Text, CodaTestRes)]
     | ResLam TypeDict (TextMap CodaTestRes) CodaVal
     deriving (Show, Read, Eq, Ord)
 
@@ -66,8 +66,8 @@ instance CodaLangEnv InterApp CodaTestRes where
         cmd <- sequenceA clcmd
         let execcmd = case cmd of
                 Run cmd' -> do
-                    makeLog Nothing (LogRun cmd')
-                    RunRes <$> getCounter
+                    oe <- makeLog Nothing (LogRun cmd')
+                    return (RunRes oe cmd')
                 ClCat val -> runCat Nothing val
                 ClMake val -> runMake Nothing val
         if null optVals then execcmd else 
@@ -140,10 +140,9 @@ makeDir val sub =
         where
             keepDirRes = error "Undefined key in record"
 
--- runCatTxt :: CodaTestRes -> InterApp Text
 runCatTxt opt val = do
-    makeLog opt (LogCat val)
-    (("catres" <>) . tshow) <$> getCounter
+    oe <- makeLog opt (LogCat val)
+    return (tshow (oe, val))
 
 runCat opt v = StrRes <$> runCatTxt opt v
 
@@ -151,12 +150,13 @@ makeLog opt cmd = case opt of
     Nothing -> do
         oe <- use (optionvars . to M.toList)
         cmdlog %= ((oe, cmd) :)
-    Just oe -> cmdlog %= ((oe, cmd) :)
+        return oe
+    Just oe -> cmdlog %= ((oe, cmd) :) >> return oe
 
 -- runMake :: () -> [(Text, CodaTestRes)] -> InterApp CodaTestRes
 runMake opt ds = do
-    makeLog opt (LogMake ds)
-    MakeRes <$> getCounter
+    oe <- makeLog opt (LogMake ds)
+    return (MakeRes oe ds)
 -- return logs of runned command and final result
 type TestInterpret = CodaVal -> ([([(Text, CodaTestRes)], CmdLog CodaTestRes)], CodaTestRes)
 
@@ -175,8 +175,8 @@ getOptEnv o = over (traverse . _2) (fromRTRes) (_clOpt o)
 instance Exec InterApp CodaTestRes where
     clRun opts deps cmd = do
         cmdlog %= ((getOptEnv opts, LogRun resCmd) :)
-        c <- getCounter
-        return (RunRes c)
+        -- c <- getCounter
+        return (RunRes (getOptEnv opts) resCmd)
         where
             resCmd = parseEle <$> cmd
             parseEle ele

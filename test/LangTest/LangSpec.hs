@@ -102,11 +102,11 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
         -- simpRCOTestSame c = simpRCOTest c c
     it "simple_let" $ do
         simpRCOTest (clet "x" [("x", 2)]) (clet "x-1" [("x-1", 2)])
-        simpRCOTest (clet "x" [("x", 2), ("x", 3)]) (clet "x-2" [("x-1", 2), ("x-2", 3)])
+        simpRCOTest (clet "x" [("x", 2), ("x", 3)]) (clet "x-2" [("x-2", 3)])
     it "nested_let" $ do
-        simpRCOTest (clet "x" [("x", clet 1 [("y", 2)])]) (clet "x-2" [("x-y-1", 2), ("x-2", 1)])
-        simpRCOTest (clet "x" [("x", clet 1 [("y", clet "z" [("z", 2)])])]) 
-            (clet "x-2" [("x-y-z-1", 2), ("x-2", 1)])
+        simpRCOTest (clet "x" [("x", clet 1 [("y", 2)])]) (clet "x-2" [("x-2", 1)])
+        simpRCOTest (clet "x" [("x", clet "y" [("y", clet "z" [("z", 2)])])]) 
+            (clet "x-y-z-1" [("x-y-z-1", 2)])
     it "dir_expression" $ do
         let dirval k = d k ["c", "d"]
             letdir k v = clet (dirval (fromString k)) [(T.pack k, v)]
@@ -119,10 +119,10 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
         simpRCOTest (clet (simpRun "bb") [("bb", 2)]) ((clet (tmpNV 2) [("bb-1", 2), (tmpN 2, (simpRun "bb-1"))]))
         simpRCOTest (clet (simpRun "k") [("k", d 2 ["a"])]) 
             (clet (tmpNV 3) [("k-1", 2 ), ("k-2", d "k-1" ["a"]), (tmpN 3, simpRun "k-2")])
-    it "random_gen_RCO" $ property
-        (\(RandCodaRCO _ cv) -> checkRCO cv)
-    it "same_result_after_RCO" $ property
-        (\(RandCodaRCO old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret cv))
+    it "random_gen_RCO" $ property $
+        quickCheckWith stdArgs{ maxSuccess = 300 }(\(RandCodaRCO _ cv) -> checkER cv)
+    it "same_result_after_RCO" $ property $
+        quickCheckWith stdArgs{ maxSuccess = 300 }(\(RandCodaRCO old cv) -> snd (dummyInterpret old) `checkRes` snd (dummyInterpret cv))
 
 doParse = fromJust . testParse
 pipelined ast = testER (testRCO (testTypeCheckVal (doParse (testPPrint ast))))
