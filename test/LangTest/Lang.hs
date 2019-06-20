@@ -20,7 +20,6 @@ import Lang.TypeCheck(typeCheck)
 import Data.Text.Prettyprint.Doc.Render.Text(renderStrict)
 import Data.Text.Prettyprint.Doc (layoutCompact)
 import           Numeric                        ( showHex )
-import Lang.EliminateRecord (runER)
 
 
 import RIO
@@ -309,13 +308,6 @@ instance Arbitrary RandCodaRCO where
     RandCodaTypeCheck old cv <- arbitrary
     return (RandCodaRCO old (testRCO cv))
 
-data RandCodaER = RandCodaER CodaVal CodaVal
-      deriving (Show, Read, Eq)
-instance Arbitrary RandCodaER where
-  arbitrary = do
-    RandCodaRCO old cv <- arbitrary
-    return (RandCodaER old (runER cv))
-
 -- short functions for writing expression
 
 instance IsString CodaVal where
@@ -440,8 +432,6 @@ checkER :: CodaVal -> Bool
 checkER v = case isERRes v of 
   Right _ -> True
   Left s -> error s
-
-testER = runER
 
 dummyInterpret = testInterpret
 dummyInterpretWIntfrc = testInterpretWIntrfc

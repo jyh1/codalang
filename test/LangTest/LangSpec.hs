@@ -21,7 +21,6 @@ langSpec = do
     rcoSpec
     pprintSpec
     typeCheckSpec
-    erSpec
     interpretInterface
 
 parseSpec :: Spec
@@ -123,22 +122,17 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
         quickCheckWith stdArgs{ maxSuccess = 300 }(\(RandCodaRCO _ cv) -> checkER cv)
     it "same_result_after_RCO" $ property $
         quickCheckWith stdArgs{ maxSuccess = 300 }(\(RandCodaRCO old cv) -> snd (dummyInterpret old) `checkRes` snd (dummyInterpret cv))
-
-doParse = fromJust . testParse
-pipelined ast = testER (testRCO (testTypeCheckVal (doParse (testPPrint ast))))
-
-erSpec :: Spec
-erSpec = describe "eliminate record" $ do
-    it "random_gen_ER AST" $ property
-        (\(RandCodaER _ cv) -> checkER cv)
-    it "same_result_after_ER" $ property
-        (\(RandCodaER old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret cv))
     -- codaval -> typecheck -> RCO -> er -> pprint -> parse -> RCO -> er -> interpret (should produce same results)
     it "same results after parse back from ER" $ property $
-        (\(RandCodaER old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret (pipelined cv)))
+        (\(RandCodaRCO old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret (pipelined cv)))
+
+
+doParse = fromJust . testParse
+pipelined ast = testRCO (testTypeCheckVal (doParse (testPPrint ast)))
+
 
 interpretInterface :: Spec
 interpretInterface = do
     it "same_result_with_two_interpreters" $ property
-        (\(RandCodaER old cv) -> 
+        (\(RandCodaRCO old cv) -> 
             dummyInterpret cv == dummyInterpretWIntfrc cv)
