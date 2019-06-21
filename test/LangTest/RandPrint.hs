@@ -28,7 +28,8 @@ data RendCoda = Parens RendCoda
     | RLet [RendCoda] RendCoda
     | ColonAnnot Text RendCoda RendCoda
     | RType CodaType
-    | RDic (Map Text RendCoda)
+    | RDic RendCoda RendCoda (Map Text RendCoda)
+    | RLam RendCoda RendCoda
     deriving (Show, Read, Eq, Ord)
 
 -- | symbol that could be surrounded with spaces
@@ -73,11 +74,14 @@ doRend rc = case rc of
         TypeBundle -> doRend (spaceSymbol "bundle")
         TypeRecord d -> bracketRend
             where
-                bracketRend = doRend (RDic (RType <$> d))
-    RDic dic -> doRend (enloseParen "{" "}" (RLis annotComma))
+                bracketRend = doRend (rDic (RType <$> d))
+        TypeLam arg res -> doRend (RLis [rArgDic (RType <$> arg), spaceSymbol "=>", RType res])
+        
+    RDic l r dic -> doRend (enloseParen l r (RLis annotComma))
         where
             annotLis = [singleColon (spaceSymbol k) v | (k, v) <- M.toList dic]
             annotComma = intersperse (spaceSymbol ",") annotLis
+    RLam arg body -> doRend (RLis [entity arg, spaceSymbol "=>", entity body])
     where
         nTimes :: Int -> (a -> a) -> (a -> a)
         nTimes 0 _ = id
@@ -93,8 +97,11 @@ doRend rc = case rc of
         rmSpace ras@RLet{} = TightParens1 ras
         rmSpace ras@ColonAnnot{} = TightParens1 ras
         rmSpace rest = rest
-        enloseParen ll lr cont = RLis [spaceSymbol ll, cont, spaceSymbol lr]
+        enloseParen ll lr cont = RLis [ll, cont, lr]
 
+
+rDic = RDic (spaceSymbol "{") (spaceSymbol "}")
+rArgDic = RDic (Symbol "[") (Symbol "]")
 
 splitLists :: [a] -> Gen ([a], [a])
 splitLists [] = return ([], [])
@@ -150,7 +157,10 @@ rendCoda cv = case cv of
             getLetLis (Let assign val1 body1) =
                 let 
                     v1 = printAssignForm assign
-                    enwAs = RLis [spaceSymbol v1, spaceSymbol "=", rendCoda val1]
+                    rendVal1 = rendCoda val1 
+                    enwAs = case rendVal1 of
+                        RLam a b -> RLis [Spaces (RLis [Symbol v1, a]), spaceSymbol "=", b]
+                        _ -> RLis [spaceSymbol v1, spaceSymbol "=", rendCoda val1]
                 in
                     over _1 (enwAs:) (getLetLis body1)
             getLetLis other = ([], rendCoda other)
@@ -159,7 +169,9 @@ rendCoda cv = case cv of
             rendVal = case val of
                 Let{} -> Parens1 (rendCoda val)
                 _ -> rendCoda val
-    Dict d -> entity (RDic (rendCoda <$> d))
+    Dict d -> entity (rDic (rendCoda <$> d))
+    Lambda arg body -> RLam (rArgDic (RType <$> arg)) (entity (rendCoda body))
+    Apply f arg -> RLis [TightParens (rendCoda f), rArgDic (rendCoda <$> arg)]
 
 randomPrintCoda :: CodaVal -> Gen String
 randomPrintCoda = doRend . rendCoda

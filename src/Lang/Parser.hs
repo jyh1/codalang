@@ -1,6 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Lang.Parser
     ( loadFile
@@ -26,30 +28,48 @@ import           Text.Parser.Token.Highlight
 import           Text.Trifecta
 import           Control.Lens                   ( _2 )
 
+data PAssign = PLetVar Text | PLetOpt Text | PLetFun Text TypeDict
+    deriving (Show, Read, Eq, Ord)
+
 data ParseRes = PLit Text
     | PVar Text
     | PStr Text
-    | PLet [(AssignForm, ParseRes)] ParseRes
+    | PLet [(PAssign, ParseRes)] ParseRes
     | PRun [ParseRes]
-    | PDir ParseRes [Text]
+    | PDir ParseRes Text
     | PConv ParseRes [CodaType]
     | PDict (Map Text ParseRes)
+    | PApply ParseRes (TextMap ParseRes)
     deriving (Show, Read, Eq, Ord)
+
+fromPLet :: PAssign -> ParseRes -> CodaVal -> CodaVal
+fromPLet pa val body = do
+    let var = case pa of
+            PLetVar t -> Variable t
+            PLetOpt t -> OptionVar t
+            PLetFun f _ -> Variable f
+        valres = fromParseRes val
+        letval = case pa of
+            PLetFun _ args -> Lambda args valres
+            _ -> valres
+    Let var letval body
+
 
 fromParseRes :: ParseRes -> CodaVal
 fromParseRes res = case res of
     PLit n       -> Lit (UUID n)
     PVar v       -> Var v
     PStr s       -> Str s
-    PLet as body -> foldr (uncurry Let)
+    PLet as body -> foldr (uncurry fromPLet)
                           (fromParseRes body)
-                          (over (traverse . _2) fromParseRes as)
+                          as
     PRun ps   -> makeCl (Run (fromParseRes <$> ps))
-    PDir home subs -> foldl' Dir (fromParseRes home) subs
+    PDir home subs -> Dir (fromParseRes home) subs
     PConv val ts -> case ts of
         [] -> fromParseRes val
         _ -> foldl' defConvert (fromParseRes val) ts
     PDict d -> Dict (fromParseRes <$> d)
+    PApply fun args -> Apply (fromParseRes fun) (fromParseRes <$> args)
 
 optionalFollowed :: (a -> b -> a) -> a -> Maybe b -> a
 optionalFollowed f a m = case m of
@@ -60,7 +80,10 @@ fileNameChar :: (TokenParsing m) => m Char
 fileNameChar = noneOf "/\\?%*:|\"><';(),{}[]\r\n\t "
 
 parseDicSyntax :: (TokenParsing m) => m a -> m b -> m [(a, b)]
-parseDicSyntax key val = braces eles
+parseDicSyntax k v = braces (parseDicEles k v)
+
+parseDicEles :: (TokenParsing m) => m a -> m b -> m [(a, b)]
+parseDicEles key val = eles
     where
         ele = liftA2 (curry id) (key <* token (symbol ":")) val
         eles = sepBy ele (symbol ",")
@@ -95,13 +118,16 @@ letExpr = highlight Constructor (token (expr <?> "let_exprssions"))
     expr =
         liftA2 PLet (letkey *> sepEndBy (try letStmt) semi <* inkey) codaExpr
 
-    letStmt :: (TokenParsing m) => m (AssignForm, ParseRes)
+    letStmt :: (TokenParsing m) => m (PAssign, ParseRes)
     letStmt = highlight Statement stmt <?> "let statement"
         where 
             stmt = token (liftA2 (,) assignable (symbolic '=' *> codaExpr))
-            globalVar :: (TokenParsing m) => m AssignForm
-            globalVar = OptionVar <$> (text "--" *> varName)
-            assignable = globalVar <|> (Variable <$> varName)
+            globalVar :: (TokenParsing m) => m PAssign
+            globalVar = PLetOpt <$> (text "--" *> varName)
+            funVar :: (TokenParsing m) => m PAssign
+            funVar = liftA2 consAssign (token varName) (optional $ typeDictExpr brackets)
+                where consAssign v = maybe (PLetVar v) (PLetFun v)
+            assignable = globalVar <|> funVar
 
 -- | used to build dir expression and paren expression
 followedByList
@@ -126,20 +152,26 @@ parenExpr = highlight Special (token (parens inside)) <?> "paren expression"
 stringExpr :: (TokenParsing m) => m ParseRes
 stringExpr = PStr <$> stringLiteral
 
--- | e/sub1/sub2/file1
-dirExpr :: (TokenParsing m) => m ParseRes
-dirExpr = highlight LiterateSyntax (token dirWithType) <?> "codalang expression"
+-- | e/sub1/sub2[...]/file1[...]
+suffixExpr :: (TokenParsing m) => m ParseRes
+suffixExpr = highlight LiterateSyntax (token suffixWithType) <?> "codalang expression"
   where
+    filename :: (TokenParsing m) => m Text
     filename = T.pack <$> many fileNameChar <?> "file name"
+    dirSep :: (TokenParsing m) => m Char
     dirSep   = highlight ReservedOperator (char '/' <?> "path seperator")
-    makeDir :: (ParseRes, Maybe [Text]) -> ParseRes
-    makeDir = uncurry (optionalFollowed PDir)
-    dirParse = token (makeDir <$> followedByList normalExpr dirSep filename)
-    dirWithType = liftA2 PConv dirParse (many typeAnnotation)
+    parseDir, parseApply :: (TokenParsing m) => m (ParseRes -> ParseRes)
+    parseDir = (flip PDir) <$> (dirSep *> filename)
+    parseApply = (flip PApply) <$> (dictExpr brackets)
+    praseSuffix = parseDir <|> parseApply
+    applySuffixes e fs = foldr ($) e (reverse fs)
+    suffixParse = token (liftA2 applySuffixes normalExpr (many praseSuffix))
+    suffixWithType = liftA2 PConv suffixParse (many typeAnnotation)
+
 
 normalExpr :: (TokenParsing m) => m ParseRes
 normalExpr =
-    (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr <|> dictExpr)
+    (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr <|> pdictExpr)
         <?> "regular codalang expression"
 
 
@@ -150,21 +182,29 @@ typeAnnotation :: (TokenParsing m) => m CodaType
 typeAnnotation = hasAnnot <?> "type annotation"
     where
         hasAnnot = makeKeyword "as" *> typeExpr
-        typeExpr :: (TokenParsing m) => m CodaType
-        typeExpr = typeStr <|> typeBunDict <?> "type expression"
-            where
-                typeStr = makeKeyword "string" $> TypeString
-                typeBun = TypeRecord . M.fromList <$> parseDicSyntax (token dictKey) (token typeExpr)
-                typeBunAll = makeKeyword "bundle" $> TypeBundle
-                typeBunDict = typeBunAll <|> typeBun 
 
-dictExpr :: (TokenParsing m) => m ParseRes
-dictExpr = do
-    let dict = M.fromList <$> parseDicSyntax (token dictKey) codaExpr
-    PDict <$> dict <?> "dictionary"
+typeExpr :: (TokenParsing m) => m CodaType
+typeExpr = typeStr <|> typeBunDict <|> typeFun <?> "type expression"
+    where
+        typeStr = makeKeyword "string" $> TypeString
+        typeBun = TypeRecord <$> (typeDictExpr braces)
+        typeBunAll = makeKeyword "bundle" $> TypeBundle
+        typeBunDict = typeBunAll <|> typeBun 
+        typeFun = liftA2 TypeLam (token (typeDictExpr brackets)) (token (symbol "=>") *> typeExpr)
+
+typeDictExpr :: (TokenParsing m) => (forall a. m a -> m a) -> m TypeDict
+typeDictExpr bra = M.fromList <$> bra (parseDicEles (token dictKey) (token typeExpr))
+
+dictExpr :: (TokenParsing m) => (forall a. m a -> m a) -> m (TextMap ParseRes)
+dictExpr bra = do
+    let dict = M.fromList <$> bra (parseDicEles (token dictKey) codaExpr)
+    dict <?> "dictionary"
+
+pdictExpr :: (TokenParsing m) => m ParseRes
+pdictExpr = PDict <$> (dictExpr braces)
 
 codaExpr :: (TokenParsing m) => m ParseRes
-codaExpr = dirExpr
+codaExpr = suffixExpr
 
 codaParser :: Parser CodaVal
 codaParser = fromParseRes <$> (spaces *> codaExpr)
