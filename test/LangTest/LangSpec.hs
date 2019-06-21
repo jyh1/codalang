@@ -123,8 +123,8 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
     it "same_result_after_RCO" $ property $
         quickCheckWith stdArgs{ maxSuccess = 300 }(\(RandCodaRCO old cv) -> snd (dummyInterpret old) `checkRes` snd (dummyInterpret cv))
     -- codaval -> typecheck -> RCO -> er -> pprint -> parse -> RCO -> er -> interpret (should produce same results)
-    it "same results after parse back from ER" $ property $
-        (\(RandCodaRCO old cv) -> checkInterpretRes (dummyInterpret old) (dummyInterpret (pipelined cv)))
+    it "same results after parse back from RCO" $ property $
+        quickCheckWith stdArgs{ maxSuccess = 300 } (\(RandCodaRCO old cv) -> snd (dummyInterpret old) `checkRes` snd (dummyInterpret (pipelined cv)))
 
 
 doParse = fromJust . testParse
