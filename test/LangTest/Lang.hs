@@ -168,15 +168,15 @@ randConvert t = do
               TypeString -> elements [TypeString, TypeBundle]
               TypeBundle -> randNoTypeLam
               TypeRecord d -> oneof (bool [] [pure TypeBundle] (notLambda t) ++ [TypeRecord <$> mapM extendType d])
-              TypeLam{} -> return t
+              TypeLam{} -> specialize t
   newt <- lift genType
   val <- decDepth (randTree newt)
   return (defConvert val t)
 
 specialize :: CodaType -> Gen CodaType
 specialize t = case t of
-  TypeRecord d -> TypeRecord <$> return d
-  TypeLam dt ret -> liftA2 TypeLam (return dt) (return ret)
+  TypeRecord d -> TypeRecord <$> specializeDic d
+  TypeLam dt ret -> liftA2 TypeLam (generalizeDic dt) (return ret)
   t -> return t
 generalizeDic, specializeDic :: TypeDict -> Gen TypeDict
 generalizeDic dt = newdic >>= (mapM generalize)
