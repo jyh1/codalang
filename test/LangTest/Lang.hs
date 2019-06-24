@@ -447,6 +447,10 @@ checkRes (DictRes d1) newval =
 checkRes (ResLam{}) (ResLam{}) = True
 checkRes res1 res2 = res1 == res2
 
+instance LoadModule Maybe where
+  loadModule _ = error "load module in test"
+  parseError e = error e
+
 testParse :: String -> Maybe CodaVal
 testParse = loadString
 
