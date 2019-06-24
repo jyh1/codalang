@@ -157,7 +157,7 @@ randLet t = do
     randAssign :: Gen AssignForm
     randAssign = frequency [
         (5, Variable <$> genVar)
-      , (1, OptionVar <$> genVar)
+      , (5, OptionVar <$> genVar)
       ]
 
 randConvert :: CodaType -> GenEnv CodaVal

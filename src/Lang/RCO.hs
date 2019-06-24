@@ -23,7 +23,7 @@ where
 import           Control.Monad.State            ( StateT
                                                 , evalStateT
                                                 )
-import           RIO                     hiding ( to )
+import           RIO                     hiding ( to, Lens', lens )
 import           Control.Lens
 import qualified RIO.Text                      as T
 import qualified RIO.Seq                       as S
@@ -45,6 +45,8 @@ type NameBinding = (Text, LetRhs)
 type NameBindings = S.Seq NameBinding
 type Path = S.Seq Text
 type RCOValMap = TextMap RCOVal
+data Closure = Closure {clovarenv :: RCOValMap, clooptenv :: RCOValMap}
+    deriving (Show)
 data RCOVal = RCOLit UUID 
     | RCOBundle VarName
     | RCOVar VarName 
@@ -52,7 +54,7 @@ data RCOVal = RCOLit UUID
     | RCODir VarName Path 
     | RCOStr Text
     | RCORec RCOValMap
-    | RCOFun TypeDict (VarMap RCOEnvVal) CodaVal
+    | RCOFun TypeDict Closure CodaVal
     deriving (Show)
 data RCO a = RCO NameBindings a
     deriving (Show, Eq, Read, Functor)
@@ -76,6 +78,8 @@ data RCOState = RCOState {
     }
 makeLenses ''RCOState
 
+closureL :: Lens' RCOState Closure
+closureL = lens (\s -> (Closure (_env s) (_optvar s))) (\s (Closure varenv optenv) -> s{_env = varenv, _optvar = optenv} )
 
 instance HasCounter RCOState where
     counterL = counter
@@ -86,6 +90,14 @@ instance HasEnv RCOState RCOEnvVal where
 instance (Monad m) => GetCounter RCOState (StateT RCOState m)
 
 instance LocalVar RCOState RCOPass RCOVal
+
+withClosure :: Closure -> RCOPass a -> RCOPass a
+withClosure clo app = do
+    oldclo <- use closureL
+    closureL .= clo
+    res <- app
+    closureL .= oldclo
+    return res
 
 withLocal :: Text -> RCOPass a -> RCOPass a
 withLocal v app = do
@@ -150,10 +162,13 @@ evalRCO rcoval = case rcoval of
 
 toRetVal :: RCOVal -> RCOPass Value
 toRetVal (RCORec dt) = Dict <$> mapM toRetVal dt
-toRetVal (RCOFun ad clo body) = sandBox $ do
-    envL .= M.union (M.mapWithKey (\k _ -> RCOVar k) ad) clo
-    bdv <- foldCoda body >>= toRetVal
-    return (Lambda ad bdv) 
+toRetVal (RCOFun ad clo@(Closure varenv _) body) = do
+    let
+        newvarenv = M.union (M.mapWithKey (\k _ -> RCOVar k) ad) varenv
+        newclo = clo{clovarenv = newvarenv}
+    withClosure newclo $ do 
+        bdv <- foldCoda body >>= toRetVal
+        return (Lambda ad bdv) 
 toRetVal (RCODir bname subdirs) = do
     _ <- toRetVal (RCOVar bname)
     return $ case subdirs of
@@ -249,8 +264,8 @@ instance CodaLangEnv RCOPass RCORes where
                     TypeRecord fdict -> case tty of
                         TypeBundle -> do
                             let castKeyT k t = do
-                                dirres <- dir fval k
-                                castFromTo dirres t TypeBundle >>= rcoValue
+                                    dirres <- dir fval k
+                                    castFromTo dirres t TypeBundle >>= rcoValue
                             bdRec <- mapWithKeyM castKeyT fdict
                             return (RCOCmd optEnv (ClMake (M.toList bdRec)))
                         TypeRecord tdict -> do
@@ -276,11 +291,14 @@ instance CodaLangEnv RCOPass RCORes where
         RCORec <$> mapM rcoLet rsv
     
     lambda arg body = do
-        clo <- use envL
-        return (RCOFun arg clo body)
+        varenv <- use envL
+        optenv <- use optvar
+        return (RCOFun arg (Closure varenv optenv) body)
     
     apply f argval = case f of
-        RCOFun argdict clo body -> sandBox $ do
-            envL .= M.union (M.intersection argval argdict) clo
-            foldCoda body
+        RCOFun argdict clo@(Closure varenv _) body -> do
+            let 
+                newvarenv = M.union (M.intersection argval argdict) varenv
+                newclo = clo {clovarenv = newvarenv}
+            withClosure newclo (foldCoda body)
         _ -> error "applying non function"

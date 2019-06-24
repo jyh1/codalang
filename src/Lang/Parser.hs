@@ -68,9 +68,7 @@ fromParseRes res = case res of
             return (foldl' defConvert valres ts)
     PDict d -> Dict <$> (mapM fromParseRes d)
     PApply fun args -> liftM2 Apply (fromParseRes fun) (mapM fromParseRes args)
-    PLoad src -> do
-        loadModule src
-        undefined
+    PLoad src -> parseModule src
 
 optionalFollowed :: (a -> b -> a) -> a -> Maybe b -> a
 optionalFollowed f a m = case m of
@@ -236,10 +234,10 @@ pathCharacter c =
     ||  c == '\x7E'
 
 codaExpr :: (TokenParsing m) => m ParseRes
-codaExpr = token (suffixExpr) <* eof
+codaExpr = token (suffixExpr)
 
 codaParser :: Parser ParseRes
-codaParser = spaces *> codaExpr
+codaParser = spaces *> codaExpr <* eof
 
 loadFile :: (LoadModule m) => String -> m CodaVal
 loadFile f = parseModule (SysPath (T.pack f))

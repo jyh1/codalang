@@ -28,7 +28,7 @@ data CodaTestRes = BunRes UUID
     | StrRes Text 
     | DictRes (Map Text CodaTestRes)
     | MakeRes [(Text, CodaTestRes)] [(Text, CodaTestRes)]
-    | ResLam TypeDict (TextMap CodaTestRes) CodaVal
+    | ResLam TypeDict (TextMap CodaTestRes) (TextMap CodaTestRes) CodaVal
     deriving (Show, Read, Eq, Ord)
 
 data CmdLog a = LogRun [a] | LogCat a | LogMake [(Text, a)]
@@ -123,12 +123,17 @@ instance CodaLangEnv InterApp CodaTestRes where
 
     lambda args body = do
         clo <- use envL
-        return (ResLam args clo body)
+        opt <- use optionvars
+        return (ResLam args clo opt body)
     apply f args = sandBox $ do
         case f of
-            ResLam argType clo body -> do
+            ResLam argType clo opt body -> do
                 envL .= M.union (M.intersection args argType) clo
-                foldCoda body
+                oldopt <- use optionvars
+                optionvars .= opt
+                res <- foldCoda body
+                optionvars .= oldopt
+                return res
             _ -> error (show f)
 
 makeDir :: CodaTestRes -> Text -> CodaTestRes
