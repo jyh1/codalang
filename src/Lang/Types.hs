@@ -141,3 +141,11 @@ data RuntimeRes a = RuntimeString Text
 data ClInfo a = ClInfo {_codaName :: Text, _clOpt :: [(Text, RuntimeRes a)]}
     deriving (Show, Read, Eq)
 makeLenses ''ClInfo
+
+
+data Module = URL Text | SysPath Text | CodaBundle Text
+    deriving (Show, Read, Eq, Ord)
+
+class (Monad m) => LoadModule m where
+    loadModule :: Module -> m ByteString
+    parseError :: String -> m a

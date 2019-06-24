@@ -10,6 +10,7 @@ module Types where
 import           RIO                     hiding ( view, over )
 import qualified RIO.Text as T
 import qualified RIO.Text.Partial as T
+import qualified RIO.ByteString as B
 import RIO.Char (showLitChar)
 import           RIO.Process
 import qualified RIO.Map                       as M
@@ -87,6 +88,13 @@ instance Exec (RIO App) Text where
     execRes <- liftIO (clcmd makeCmd) >>= parseUUID
     appLog (Assign [EntOptEnv vn] [EntUUID execRes])
     return execRes
+
+instance LoadModule (RIO App) where
+  loadModule m = case m of
+    SysPath p -> B.readFile (T.unpack p)
+  parseError e = do
+    logError (display (T.pack e))
+    throwString "parsing error"
 
 consOptionList :: (ClInfo Text) -> ClOption
 consOptionList (ClInfo vname optList) = ("name", vname) : (over (traverse . _2) extractStr optList)

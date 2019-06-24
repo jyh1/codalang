@@ -2,7 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Lang.Parser
     ( loadFile
@@ -17,16 +16,11 @@ import           Lang.Types
 import           RIO                     hiding ( try )
 import qualified RIO.Text                      as T
 import qualified RIO.Map                       as M
--- import           Text.Parser.Combinators        ( (<?>) )
 import           Text.Parser.Combinators
--- import Text.Parser.Expression
 import           Text.Parser.Token
--- import           Text.Parser.Char
 import           Text.Parser.Char               ( char )
--- import           Text.Parser.Token.Style        ( emptyOps )
 import           Text.Parser.Token.Highlight
 import           Text.Trifecta
-import           Control.Lens                   ( _2 )
 
 data PAssign = PLetVar Text | PLetOpt Text | PLetFun Text TypeDict
     deriving (Show, Read, Eq, Ord)
@@ -40,36 +34,43 @@ data ParseRes = PLit Text
     | PConv ParseRes [CodaType]
     | PDict (Map Text ParseRes)
     | PApply ParseRes (TextMap ParseRes)
-    deriving (Show, Read, Eq, Ord)
+    | PLoad Module
+        deriving (Show, Read, Eq, Ord) 
 
-fromPLet :: PAssign -> ParseRes -> CodaVal -> CodaVal
+
+fromPLet :: (LoadModule m) => PAssign -> ParseRes -> m CodaVal -> m CodaVal
 fromPLet pa val body = do
     let var = case pa of
             PLetVar t -> Variable t
             PLetOpt t -> OptionVar t
             PLetFun f _ -> Variable f
-        valres = fromParseRes val
-        letval = case pa of
+    valres <- fromParseRes val
+    let letval = case pa of
             PLetFun _ args -> Lambda args valres
             _ -> valres
-    Let var letval body
+    Let var letval <$> body
 
 
-fromParseRes :: ParseRes -> CodaVal
+fromParseRes :: (LoadModule m) => ParseRes -> m CodaVal
 fromParseRes res = case res of
-    PLit n       -> Lit (UUID n)
-    PVar v       -> Var v
-    PStr s       -> Str s
+    PLit n       -> return $ Lit (UUID n)
+    PVar v       -> return $ Var v
+    PStr s       -> return $ Str s
     PLet as body -> foldr (uncurry fromPLet)
                           (fromParseRes body)
                           as
-    PRun ps   -> makeCl (Run (fromParseRes <$> ps))
-    PDir home subs -> Dir (fromParseRes home) subs
+    PRun ps   -> (makeCl . Run) <$> (mapM fromParseRes ps)
+    PDir home subs -> (`Dir` subs) <$> fromParseRes home
     PConv val ts -> case ts of
         [] -> fromParseRes val
-        _ -> foldl' defConvert (fromParseRes val) ts
-    PDict d -> Dict (fromParseRes <$> d)
-    PApply fun args -> Apply (fromParseRes fun) (fromParseRes <$> args)
+        _ -> do
+            valres <- fromParseRes val
+            return (foldl' defConvert valres ts)
+    PDict d -> Dict <$> (mapM fromParseRes d)
+    PApply fun args -> liftM2 Apply (fromParseRes fun) (mapM fromParseRes args)
+    PLoad src -> do
+        loadModule src
+        undefined
 
 optionalFollowed :: (a -> b -> a) -> a -> Maybe b -> a
 optionalFollowed f a m = case m of
@@ -171,7 +172,7 @@ suffixExpr = highlight LiterateSyntax (token suffixWithType) <?> "codalang expre
 
 normalExpr :: (TokenParsing m) => m ParseRes
 normalExpr =
-    (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr <|> pdictExpr)
+    (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr <|> pdictExpr <|> loadExpr)
         <?> "regular codalang expression"
 
 
@@ -203,19 +204,58 @@ dictExpr bra = do
 pdictExpr :: (TokenParsing m) => m ParseRes
 pdictExpr = PDict <$> (dictExpr braces)
 
+loadExpr :: (TokenParsing m) => m ParseRes
+loadExpr = token (token (text "%load") *> (PLoad <$> modExpr))
+    where
+        modExpr = liftA2 ($) scheme pathComponent
+
+scheme :: (TokenParsing m) => m (Text -> Module)
+scheme = url <|> file <|> (pure CodaBundle)
+    where
+        makeURL sch l = URL (sch <> "://" <> l)
+        url =         
+            (text "http")
+            *>  ((text "s" *> pure (makeURL "https")) <|> pure (makeURL "http")) 
+            <* (text "://")
+        file = (\pref l -> SysPath (pref <> l)) <$> (text "./" <|> text "/")
+
+pathComponent :: (TokenParsing m) => m Text
+pathComponent = T.pack <$> many (satisfy (\c -> c /= ';' && pathCharacter c) <|> char '/')
+
+pathCharacter :: Char -> Bool
+pathCharacter c =
+         '\x21' == c
+    ||  ('\x24' <= c && c <= '\x27')
+    ||  ('\x2A' <= c && c <= '\x2B')
+    ||  ('\x2D' <= c && c <= '\x2E')
+    ||  ('\x30' <= c && c <= '\x3B')
+    ||  c == '\x3D'
+    ||  ('\x40' <= c && c <= '\x5A')
+    ||  ('\x5E' <= c && c <= '\x7A')
+    ||  c == '\x7C'
+    ||  c == '\x7E'
+
 codaExpr :: (TokenParsing m) => m ParseRes
-codaExpr = suffixExpr
+codaExpr = token (suffixExpr) <* eof
 
-codaParser :: Parser CodaVal
-codaParser = fromParseRes <$> (spaces *> codaExpr)
+codaParser :: Parser ParseRes
+codaParser = spaces *> codaExpr
 
-loadFile :: (MonadIO m) => String -> m (Maybe CodaVal)
-loadFile = parseFromFile codaParser
+loadFile :: (LoadModule m) => String -> m CodaVal
+loadFile f = parseModule (SysPath (T.pack f))
 
-loadString :: String -> Maybe CodaVal
-loadString inp = case parseString codaParser mempty inp of
-    Success a -> Just a
-    Failure _ -> Nothing
+parseModule :: (LoadModule m) => Module -> m CodaVal
+parseModule mdl = do
+    s <- loadModule mdl
+    fromResult (parseByteString codaParser mempty s)
+
+loadString :: (LoadModule m) => String -> m CodaVal
+loadString inp = fromResult (parseString codaParser mempty inp)
+
+fromResult :: (LoadModule m) => Result ParseRes -> m CodaVal
+fromResult res = case res of
+    Success a -> fromParseRes a
+    Failure xs -> parseError (show (_errDoc xs))
 
 -- parse UUID from command line output
 uuidParser :: Parser UUID

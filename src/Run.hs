@@ -14,8 +14,7 @@ run :: RIO App ()
 run = do
   source <- view (appOptions . to optionsSourceFile)
   logInfo (display ("parsing from " <> T.pack source))
-  parsed <- loadFile source
-  codaAST <- maybe (throwString "") return parsed
+  codaAST <- loadFile source
   logInfo "type checking"
   tcAST <- runTypeCheck codaAST
   logInfo "remove-complex-operation"
