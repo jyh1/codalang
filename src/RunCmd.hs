@@ -8,11 +8,12 @@ import qualified RIO.Text as T
 import qualified RIO.Map as M
 import qualified RIO.Set as S
 import qualified System.Process.Typed as P
+import qualified RIO.ByteString.Lazy as BL
 
 import Lang.Lang
 
-cmdExec :: Execute -> IO ByteString
-cmdExec exec = case exec of
+cmdExec :: Int64 -> Execute -> IO ByteString
+cmdExec bufferSize exec = case exec of
     ExecRun env cmd opts ->
         procStdout process
         where
@@ -24,7 +25,8 @@ cmdExec exec = case exec of
         let vstr = T.unpack v
             optArgs = makeOptArgs catOptions opts
         P.runProcess_ (P.setStdout P.createPipe (makeProc ["wait", vstr]))
-        procStdout (makeProc ["cat", vstr])
+        (catres, _) <- P.readProcess_ (makeProc ["cat", vstr])
+        return (toStrictBytes (BL.take bufferSize catres))
     ExecMake ks opts -> do
         let cmdstr = buildEnv ks
             optArgs = makeOptArgs makeOptions opts

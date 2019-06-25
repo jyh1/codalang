@@ -7,11 +7,11 @@
 
 module Types where
 
-import           RIO                     hiding ( view, over, (^.) )
+import           RIO                     hiding ( view, over, (^.), to )
 import qualified RIO.Text as T
 import qualified RIO.Text.Partial as T
 import qualified RIO.ByteString as B
-import RIO.ByteString.Lazy (toStrict)
+import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (showLitChar)
 import           RIO.Process
 import qualified RIO.Map                       as M
@@ -25,6 +25,7 @@ data Options = Options
   { 
     optionsVerbose :: !Bool
     , optionsExpr :: String
+    , optionsBufferSize :: Int64
   }
 
 data App = App
@@ -99,7 +100,8 @@ instance LoadModule (RIO App) where
       liftIO (clcmd (ExecCat b []))
     URL l -> do
       r <- liftIO $ Wreq.get (T.unpack l)
-      return (toStrict (r ^. Wreq.responseBody))
+      buffsize <- view (appOptions . to optionsBufferSize)
+      return (BL.toStrict (BL.take buffsize (r ^. Wreq.responseBody)))
   parseError e = do
     logError (display (T.pack e))
     throwString "parsing error"

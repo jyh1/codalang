@@ -23,6 +23,7 @@ main = do
                   )
       
       <*> inputExpr
+      <*> maxbuffer
     )
     empty
   lo <- logOptionsHandle stderr (optionsVerbose options)
@@ -32,7 +33,7 @@ main = do
           { _appLogFunc = lf
           , _appProcessContext = pc
           , _appOptions = options
-          , _appClCmd = cmdExec
+          , _appClCmd = cmdExec (optionsBufferSize options)
           }
      in runRIO app run
 
@@ -48,3 +49,11 @@ inputExpr = codaExpr <|> inputFile
     inputFile = ("%load " ++ ) <$> strArgument (metavar "ARGUMENT" <> help msg)
       where
         msg = "this is equivalent with '%load ARUGMENT', system filepath should always start with '/' or './'"
+
+maxbuffer :: Parser Int64
+maxbuffer = option auto (
+       long "buffersize"
+    <> value (100 * 2^10)
+    <> help "number of bytes for string casting and network request"
+    <> metavar "int"
+    )
