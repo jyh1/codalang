@@ -152,6 +152,12 @@ makeLenses ''ClInfo
 data Module = URL Text | SysPath Text | CodaBundle Text
     deriving (Show, Read, Eq, Ord)
 
+moduleTxt :: Module -> Text
+moduleTxt m = case m of
+    URL t -> t
+    SysPath t -> t
+    CodaBundle t -> t
+
 class (Monad m) => LoadModule m where
-    loadModule :: Module -> m ByteString
+    loadModule :: Module -> (ByteString -> m a) -> m a
     parseError :: String -> m a

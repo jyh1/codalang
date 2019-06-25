@@ -7,10 +7,12 @@
 
 module Types where
 
-import           RIO                     hiding ( view, over, (^.), to )
+import           RIO                     hiding ( view, over, (^.), to, Lens' )
 import qualified RIO.Text as T
+import Control.Monad.State
 import qualified RIO.Text.Partial as T
 import qualified RIO.ByteString as B
+import RIO.List.Partial
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (showLitChar)
 import           RIO.Process
@@ -92,19 +94,47 @@ instance Exec (RIO App) Text where
     appLog (Assign [EntOptEnv vn] [EntUUID execRes])
     return execRes
 
-instance LoadModule (RIO App) where
-  loadModule m = case m of
-    SysPath p -> B.readFile (T.unpack p)
-    CodaBundle b -> do
-      clcmd <- view appClCmd
-      liftIO (clcmd (ExecCat b []))
-    URL l -> do
-      r <- liftIO $ Wreq.get (T.unpack l)
-      buffsize <- view (appOptions . to optionsBufferSize)
-      return (BL.toStrict (BL.take buffsize (r ^. Wreq.responseBody)))
+type LoadState = [Module]
+loadStack :: Lens' LoadState [Module]
+loadStack = id
+stackInf :: LoadState -> Text
+stackInf ls = tshow (view (loadStack . to (map moduleTxt)) ls)
+
+instance LoadModule (StateT LoadState (RIO App)) where
+  loadModule m app = do
+    hasCircle <- use (loadStack . to listMem)
+    bool doLoad circleErr hasCircle
+    where
+      listMem = anyOf traverse (== m)
+      circleErr = do
+        loadTxt <- use (to stackInf)
+        logError ("Circle depedency during parsing: " <> display loadTxt)
+        throwString ("parsing error")
+      doLoad = do
+        loadStack %= (m :)
+        content <- case m of
+          SysPath p -> B.readFile (T.unpack p)
+          CodaBundle b -> do
+            clcmd <- view appClCmd
+            liftIO (clcmd (ExecCat b []))
+          URL l -> do
+            r <- liftIO $ Wreq.get (T.unpack l)
+            buffsize <- view (appOptions . to optionsBufferSize)
+            return (BL.toStrict (BL.take buffsize (r ^. Wreq.responseBody)))
+        res <- app content
+        loadStack %= tail
+        return res
   parseError e = do
+    loadTxt <- use (to stackInf)
+    logError ("During parsing: " <> display loadTxt)
     logError (display (T.pack e))
-    throwString "parsing error"
+    throwString ("parsing error")
+
+runParser :: String -> RIO App CodaVal
+runParser s = evalStateT parse []
+    where
+      parse :: StateT [Module] (RIO App) CodaVal
+      parse = loadString s
 
 consOptionList :: (ClInfo Text) -> ClOption
 consOptionList (ClInfo vname optList) = ("name", vname) : (over (traverse . _2) extractStr optList)

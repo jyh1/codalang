@@ -244,8 +244,7 @@ loadFile f = parseModule (SysPath (T.pack f))
 
 parseModule :: (LoadModule m) => Module -> m CodaVal
 parseModule mdl = do
-    s <- loadModule mdl
-    fromResult (parseByteString codaParser mempty s)
+    loadModule mdl (\s -> fromResult (parseByteString codaParser mempty s))
 
 loadString :: (LoadModule m) => String -> m CodaVal
 loadString inp = fromResult (parseString codaParser mempty inp)
