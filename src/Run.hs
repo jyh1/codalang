@@ -13,9 +13,9 @@ import Lang.Lang
 
 run :: RIO App ()
 run = do
-  source <- view (appOptions . to optionsSourceFile)
-  logInfo (display ("parsing from " <> T.pack source))
-  codaAST <- loadFile source
+  source <- view (appOptions . to optionsExpr)
+  logInfo (display ("executing " <> T.pack source))
+  codaAST <- loadString source
   logInfo "type checking"
   (tcTy, tcAST) <- runTypeCheck codaAST
   if containLambda tcTy then

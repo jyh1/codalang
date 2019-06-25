@@ -24,7 +24,7 @@ import           Lang.Lang
 data Options = Options
   { 
     optionsVerbose :: !Bool
-    , optionsSourceFile :: String
+    , optionsExpr :: String
   }
 
 data App = App

@@ -21,7 +21,8 @@ main = do
                  <> short 'v'
                  <> help "Verbose output?"
                   )
-      <*> argument str (metavar "FILE")
+      
+      <*> inputExpr
     )
     empty
   lo <- logOptionsHandle stderr (optionsVerbose options)
@@ -34,3 +35,16 @@ main = do
           , _appClCmd = cmdExec
           }
      in runRIO app run
+
+
+inputExpr :: Parser String
+inputExpr = codaExpr <|> inputFile
+  where
+    codaExpr = strOption (
+      short 'c'
+      <> metavar "EXPR"
+      <> help "input expression"
+      )
+    inputFile = ("%load " ++ ) <$> strArgument (metavar "ARGUMENT" <> help msg)
+      where
+        msg = "this is equivalent with '%load ARUGMENT', system filepath should always start with '/' or './'"
