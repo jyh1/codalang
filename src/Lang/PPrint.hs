@@ -4,7 +4,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Lang.PPrint(codaToDoc, pprintCodaWidth, pprintCoda, pprintCompact) where
+module Lang.PPrint(codaToDoc
+    , pprintCodaWidth
+    , pprintCoda
+    , pprintCompact
+    , pprintType) 
+    where
 
 import Lang.Types
 import Lang.Fold
@@ -150,6 +155,11 @@ pprintCodaWidth n cv = renderStrict (layoutSmart opt doc)
 
 pprintCoda :: CodaVal -> Text
 pprintCoda = pprintCodaWidth 75
+
+pprintType :: CodaType -> Text
+pprintType ty = renderStrict (layoutSmart opt (pretty ty))
+    where
+        opt = LayoutOptions (AvailablePerLine 75 1) 
 
 pprintCompact :: CodaVal -> Text
 pprintCompact cv = renderStrict (layoutCompact (codaToDoc cv))

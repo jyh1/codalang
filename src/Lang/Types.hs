@@ -82,6 +82,12 @@ type TypeDict = TextMap CodaType
 data CodaType = TypeString | TypeBundle | TypeRecord TypeDict | TypeLam TypeDict CodaType
     deriving (Eq, Ord, Read, Show)
 
+containLambda :: CodaType -> Bool
+containLambda ty = case ty of
+    TypeLam{} -> True
+    TypeRecord tr -> allOf traverse containLambda tr
+    _ -> False
+
 isSubtypeOf :: CodaType -> CodaType -> Bool
 isSubtypeOf (TypeRecord d1) (TypeRecord d2) = dictMinus isSubtypeOf d2 d1
 isSubtypeOf TypeBundle (TypeRecord d1) = allOf traverse (TypeBundle `isSubtypeOf`) d1
