@@ -28,6 +28,7 @@ dependencies:
 - trifecta
 - parsers
 - prettyprinter
+- wreq
 
 ghc-options:
 - -Wall

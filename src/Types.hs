@@ -7,14 +7,16 @@
 
 module Types where
 
-import           RIO                     hiding ( view, over )
+import           RIO                     hiding ( view, over, (^.) )
 import qualified RIO.Text as T
 import qualified RIO.Text.Partial as T
 import qualified RIO.ByteString as B
+import RIO.ByteString.Lazy (toStrict)
 import RIO.Char (showLitChar)
 import           RIO.Process
 import qualified RIO.Map                       as M
 import           Control.Lens
+import qualified Network.Wreq as Wreq
 
 import           Lang.Lang
 
@@ -92,6 +94,12 @@ instance Exec (RIO App) Text where
 instance LoadModule (RIO App) where
   loadModule m = case m of
     SysPath p -> B.readFile (T.unpack p)
+    CodaBundle b -> do
+      clcmd <- view appClCmd
+      liftIO (clcmd (ExecCat b []))
+    URL l -> do
+      r <- liftIO $ Wreq.get (T.unpack l)
+      return (toStrict (r ^. Wreq.responseBody))
   parseError e = do
     logError (display (T.pack e))
     throwString "parsing error"
