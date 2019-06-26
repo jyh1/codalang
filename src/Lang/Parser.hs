@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DerivingVia #-}
 
 module Lang.Parser
     ( loadFile
@@ -21,6 +22,7 @@ import           Text.Parser.Token
 import           Text.Parser.Char               ( char )
 import           Text.Parser.Token.Highlight
 import           Text.Trifecta
+import           Data.Char (isSpace)
 
 data PAssign = PLetVar Text | PLetOpt Text | PLetFun Text TypeDict
     deriving (Show, Read, Eq, Ord)
@@ -36,6 +38,22 @@ data ParseRes = PLit Text
     | PApply ParseRes (TextMap ParseRes)
     | PLoad Module
         deriving (Show, Read, Eq, Ord) 
+
+
+newtype CodaParser a = CodaParser {unCodaParser :: Parser a}
+    deriving (
+          Functor
+        , Applicative
+        , Alternative
+        , Parsing
+        , CharParsing
+        ) via Parser
+
+instance TokenParsing CodaParser where
+    someSpace = skipSome commentOrSpace
+        where
+            comment = (text "//" *> manyTill anyChar newline) $> ()
+            commentOrSpace = (satisfy isSpace $> ()) <|> comment
 
 
 fromPLet :: (LoadModule m) => PAssign -> ParseRes -> m CodaVal -> m CodaVal
@@ -237,7 +255,7 @@ codaExpr :: (TokenParsing m) => m ParseRes
 codaExpr = token (suffixExpr)
 
 codaParser :: Parser ParseRes
-codaParser = spaces *> codaExpr <* eof
+codaParser = unCodaParser (spaces *> codaExpr <* eof)
 
 loadFile :: (LoadModule m) => String -> m CodaVal
 loadFile f = parseModule (SysPath (T.pack f))
