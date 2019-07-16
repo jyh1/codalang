@@ -52,7 +52,7 @@ newtype CodaParser a = CodaParser {unCodaParser :: Parser a}
 instance TokenParsing CodaParser where
     someSpace = skipSome commentOrSpace
         where
-            comment = (text "//" *> manyTill anyChar newline) $> ()
+            comment = (text "#" *> manyTill anyChar ((newline $> ()) <|> eof)) $> ()
             commentOrSpace = (satisfy isSpace $> ()) <|> comment
 
 
