@@ -62,7 +62,7 @@ prepLetRhs vn cv = case cv of
     Convert _ val TypeBundle -> do
         valRes <- runCoda val
         case valRes of
-            RuntimeString t -> lift (fromBundleName t) >>= (\b -> prepLetRhs vn (Lit b))
+            RuntimeString t -> RuntimeBundle <$> lift (fromBundleName t)
             RuntimeBundle{} -> return valRes
     Dir{} -> runCoda cv
     Str{} -> runCoda cv

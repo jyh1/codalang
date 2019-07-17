@@ -136,7 +136,7 @@ class (Monad m) => Exec m a where
     clLit :: Text -> UUID -> m a
     clMake :: (ClInfo a) -> [(Text, a)] -> m a
     strLit :: Text -> m a
-    fromBundleName :: a -> m UUID
+    fromBundleName :: a -> m a
     execDir :: a -> Text -> m a
     execRec :: TextMap a -> m a
 

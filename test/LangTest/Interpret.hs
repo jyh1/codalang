@@ -193,7 +193,7 @@ instance Exec InterApp CodaTestRes where
     clCat opts v = StrRes <$> runCatTxt (Just (_clOpt opts)) v
     clMake opts ks = runMake (Just (_clOpt opts)) ks
     strLit s = return (StrRes s)
-    fromBundleName (StrRes s) = return (BundleName s)
+    fromBundleName (StrRes s) = return (BunRes (BundleName s))
     execDir d p = return (fromDirRes d [p])
     execRec dict = return (DictRes dict)
 

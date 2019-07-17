@@ -93,7 +93,7 @@ instance Exec (RIO App) Text where
     appLog (Assign [EntOptEnv vn] [EntUUID execRes])
     return execRes
   strLit s = return s
-  fromBundleName bn = return (BundleName bn)
+  fromBundleName bn = return bn
   execDir d p = return (buildPath [d, p])
   execRec mp = return (tshow mp)
 
