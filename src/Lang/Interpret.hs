@@ -19,6 +19,10 @@ import           Lang.Types
 type RunEnv a = Map Text (RuntimeRes a)
 type RunCoda m a = StateT (RunEnv a) m (RuntimeRes a)
 
+data RuntimeRes a = RuntimeString {fromRuntimeRes :: a} 
+    | RuntimeBundle {fromRuntimeRes :: a}
+    deriving (Show, Read, Eq, Ord)
+
 evalCoda :: (Exec m a, Ord a) => CodaVal -> m a
 evalCoda cv = evalStateT (runCodaRes cv) mempty
 

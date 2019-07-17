@@ -140,9 +140,6 @@ class (Monad m) => Exec m a where
     execDir :: a -> Text -> m a
     execRec :: TextMap a -> m a
 
-data RuntimeRes a = RuntimeString {fromRuntimeRes :: a} 
-    | RuntimeBundle {fromRuntimeRes :: a}
-    deriving (Show, Read, Eq, Ord)
 
 data ClInfo a = ClInfo {_codaName :: Text, _clOpt :: [(Text, a)]}
     deriving (Show, Read, Eq)
