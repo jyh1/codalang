@@ -75,24 +75,27 @@ instance Exec (RIO App) Text where
     appLog (Assign [EntOptEnv vn, EntParen (EntUUID resid)] (escapeVerbatim <$> cmdTxt))
     return resid
    where
-    cmdTxt = map fromEle cmd
-    fromDep (Deps u subs) = buildPath (u : subs)
-    depTxt  = M.toList (fromDep <$> depMap)
+    cmdTxt = fromEle <$> cmd
+    depTxt  = M.toList depMap
     execCmd = ExecRun depTxt cmdTxt (consOptionList vn)
   clCat vn val = do
     clcmd <- view appClCmd
     res <- liftIO (clcmd execCmd)
     let resText = decodeUtf8Lenient res
     appLog (Assign [EntOptEnv vn] [EntVerbatim (tshow resText)])
-    return (RuntimeString resText)
+    return resText
     where
-      execCmd = ExecCat (fromDeps val) (consOptionList vn)
+      execCmd = ExecCat val (consOptionList vn)
   clMake vn ks = do
     clcmd <- view appClCmd
-    let makeCmd = ExecMake (over (traverse . _2) fromDeps ks) (consOptionList vn)
+    let makeCmd = ExecMake ks (consOptionList vn)
     execRes <- liftIO (clcmd makeCmd) >>= parseUUID
     appLog (Assign [EntOptEnv vn] [EntUUID execRes])
     return execRes
+  strLit s = return s
+  fromBundleName bn = return (BundleName bn)
+  execDir d p = return (buildPath [d, p])
+  execRec mp = return (tshow mp)
 
 type LoadState = [Module]
 loadStack :: Lens' LoadState [Module]
@@ -137,17 +140,15 @@ runParser s = evalStateT parse []
       parse = loadString s
 
 consOptionList :: (ClInfo Text) -> ClOption
-consOptionList (ClInfo vname optList) = ("name", vname) : (over (traverse . _2) extractStr optList)
-  where
-    extractStr (RuntimeString t) = t
+consOptionList (ClInfo vname optList) = ("name", vname) : optList
 
-fromDeps :: Deps Text -> Text
-fromDeps (Deps r ps) = buildPath (r : ps)
+-- fromDeps :: Deps Text -> Text
+-- fromDeps (Deps r ps) = buildPath (r : ps)
 
-fromEle :: CMDEle Text -> Text
+fromEle :: CMDEle Text Text -> Text
 fromEle e = case e of
     Plain t        -> t
-    BundleRef r ps -> fromDeps (Deps r ps)
+    BundleRef r ps -> buildPath (r:ps)
       
 parseUUID :: ByteString -> RIO App Text
 parseUUID res = do

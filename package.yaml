@@ -29,6 +29,7 @@ dependencies:
 - parsers
 - prettyprinter
 - wreq
+- aeson
 
 ghc-options:
 - -Wall

@@ -173,52 +173,40 @@ testInterpret cv = (_cmdlog env, res)
         (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
 
 -- use interpret interface (after RCO)
-getOptEnv :: ClInfo CodaTestRes -> [(Text, CodaTestRes)]
-getOptEnv o = over (traverse . _2) (fromRTRes) (_clOpt o)
-    where
-        fromRTRes (RuntimeString t) = StrRes t
 instance Exec InterApp CodaTestRes where
     clRun opts deps cmd = do
-        cmdlog %= ((getOptEnv opts, LogRun resCmd) :)
+        cmdlog %= ((_clOpt opts, LogRun resCmd) :)
         -- c <- getCounter
-        return (RunRes (getOptEnv opts) resCmd)
+        return (RunRes (_clOpt opts) resCmd)
         where
             resCmd = parseEle <$> cmd
             parseEle ele
                 -- | traceShow eleDep False = undefined 
                 -- | length paths == 1 = StrRes ele
                 | otherwise = case ele of
-                    Plain t -> StrRes t
+                    Plain t -> t
                     BundleRef eleVar ps -> 
                         let eleDep = view (at eleVar . to (fromMaybe undefined)) deps in 
-                            fromDep eleDep ps
+                            fromDirRes eleDep ps
                             
     clLit _ u = return (BunRes u)
-    clCat opts v = RuntimeString <$> runCatTxt (Just (getOptEnv opts)) (fromDep v [])
-    clMake opts ks = runMake (Just (getOptEnv opts)) (over (traverse . _2) ( `fromDep` []) ks)
+    clCat opts v = StrRes <$> runCatTxt (Just (_clOpt opts)) v
+    clMake opts ks = runMake (Just (_clOpt opts)) ks
+    strLit s = return (StrRes s)
+    fromBundleName (StrRes s) = return (BundleName s)
+    execDir d p = return (fromDirRes d [p])
+    execRec dict = return (DictRes dict)
 
-fromDep (Deps tres depPath) elePath
-    | null ps = tres
+fromDirRes tres elePath
+    | null elePath = tres
     | otherwise = case tres of
-        DirRes r sub -> DirRes r (sub ++ ps)
-        _ -> DirRes tres ps
-    where
-        ps = depPath ++ elePath
+        DirRes r sub -> DirRes r (sub ++ elePath)
+        _ -> DirRes tres elePath
 
--- catToBundle (CatRes i) = RunRes i
--- catToBundle (DirRes k p) = DirRes (catToBundle k) p
--- catToBundle v = v
 
 testInterpretWIntrfc :: TestInterpret
-testInterpretWIntrfc cv = (_cmdlog env, newRes res)
+testInterpretWIntrfc cv = (_cmdlog env, res)
     where
-        app :: InterApp (RuntimeRes CodaTestRes)
+        app :: InterApp CodaTestRes
         app = evalCoda cv
         (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
-        newRes res = case res of
-            RuntimeString t -> StrRes t
-            RuntimeBundle m ps -> case (m, ps) of
-                (DirRes r rps, _) -> DirRes r (rps ++ ps)
-                (other, []) -> other
-                (other, ps) -> DirRes other ps
-            RuntimeRecord ks -> DictRes (newRes <$> M.fromList ks)

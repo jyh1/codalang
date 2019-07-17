@@ -126,25 +126,25 @@ data Execute = ExecRun [(Text, Text)] [Text] ClOption
 buildPath :: [Text] -> Text
 buildPath = T.intercalate "/"
 
-data Deps a = Deps a [Text]
+data CMDEle a b = Plain b | BundleRef a [Text]
     deriving (Show, Read, Eq, Ord)
-
-data CMDEle a = Plain Text | BundleRef a [Text]
-    deriving (Show, Read, Eq, Functor, Ord)
 
 
 class (Monad m) => Exec m a where
-    clRun :: (ClInfo a) -> Map Text (Deps a) -> [CMDEle Text] -> m a
-    clCat :: (ClInfo a) -> Deps a -> m (RuntimeRes a)
+    clRun :: (ClInfo a) -> TextMap a -> [CMDEle Text a] -> m a
+    clCat :: (ClInfo a) -> a -> m a
     clLit :: Text -> UUID -> m a
-    clMake :: (ClInfo a) -> [(Text, Deps a)] -> m a
+    clMake :: (ClInfo a) -> [(Text, a)] -> m a
+    strLit :: Text -> m a
+    fromBundleName :: a -> m UUID
+    execDir :: a -> Text -> m a
+    execRec :: TextMap a -> m a
 
-data RuntimeRes a = RuntimeString Text 
-    | RuntimeBundle a [Text] 
-    | RuntimeRecord [(Text, RuntimeRes a)]
+data RuntimeRes a = RuntimeString {fromRuntimeRes :: a} 
+    | RuntimeBundle {fromRuntimeRes :: a}
     deriving (Show, Read, Eq, Ord)
 
-data ClInfo a = ClInfo {_codaName :: Text, _clOpt :: [(Text, RuntimeRes a)]}
+data ClInfo a = ClInfo {_codaName :: Text, _clOpt :: [(Text, a)]}
     deriving (Show, Read, Eq)
 makeLenses ''ClInfo
 

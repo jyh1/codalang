@@ -22,8 +22,8 @@ run = do
   else do
     logInfo "remove-complex-operation"
     let rcoAST = runRCO tcAST
-    res <- evalCoda rcoAST :: RIO App (RuntimeRes Text)
-    logInfo (display (tshow res))
+    res <- evalCoda rcoAST :: RIO App Text
+    logInfo (display res)
 
   -- logInfo "Codalang"
 runTypeCheck :: (MonadIO m) => CodaVal -> m (CodaType, CodaVal)
