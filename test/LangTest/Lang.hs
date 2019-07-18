@@ -17,11 +17,12 @@ import Lang.RCO
 import Lang.Parser
 import Lang.PPrint
 import Lang.TypeCheck(typeCheck)
+import Lang.JLang
+
+
 import Data.Text.Prettyprint.Doc.Render.Text(renderStrict)
 import Data.Text.Prettyprint.Doc (layoutCompact)
 import           Numeric                        ( showHex )
-
-
 import RIO
 import RIO.List (delete)
 import qualified RIO.Text as T
@@ -307,6 +308,11 @@ instance Arbitrary RandCodaRCO where
   arbitrary = do
     RandCodaTypeCheck old cv <- arbitrary
     return (RandCodaRCO old (testRCO cv))
+
+instance Arbitrary JLang where
+  arbitrary = do
+    RandCodaRCO _ cv <- arbitrary
+    return (toJLang cv)
 
 -- short functions for writing expression
 

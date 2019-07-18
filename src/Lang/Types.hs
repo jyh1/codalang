@@ -13,7 +13,8 @@ module Lang.Types where
 import           RIO
 import qualified RIO.Text as T
 import qualified RIO.Map as M
-import           Control.Lens
+import           Control.Lens hiding ((.=))
+import Data.Aeson
 
 -- UUID of CodaLab bundle
 data UUID = UUID Text | BundleName Text
@@ -129,6 +130,15 @@ buildPath = T.intercalate "/"
 data CMDEle a b = Plain b | BundleRef a [Text]
     deriving (Show, Read, Eq, Ord)
 
+instance (ToJSON a, ToJSON b) => ToJSON (CMDEle a b) where
+    toJSON e = case e of
+        Plain b -> toJSON b
+        BundleRef r ps -> object ["root" .= r, "path" .= ps]
+
+instance (FromJSON a, FromJSON b) => FromJSON (CMDEle a b) where
+    parseJSON o@(Object v) = 
+        (BundleRef <$> v .: "root" <*> v .: "path") <|> (Plain <$> parseJSON o)
+    parseJSON rest = Plain <$> parseJSON rest
 
 class (Monad m) => Exec m a where
     clRun :: (ClInfo a) -> TextMap a -> [CMDEle Text a] -> m a

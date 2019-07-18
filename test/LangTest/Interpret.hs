@@ -242,7 +242,7 @@ evalBlk (JBlock v opt cmd) = do
             let resCmd = parseEle depRes <$> cmdRes
             cmdlog %= ((optVal, LogRun resCmd) :)
             return (RunRes optVal resCmd)
-        JLit v -> evalBunJRes v
+        JLit v -> return (BunRes v)
     envL . at v ?= res
 
 fromCMDEle :: CMDEle Text JRes -> InterApp (CMDEle Text CodaTestRes)

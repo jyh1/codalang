@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module LangTest.LangSpec(langSpec) where
 
@@ -12,8 +13,11 @@ import LangTest.Lang
 import qualified RIO.Text as T
 
 import RIO.Map (fromList)
+import RIO.Partial (fromJust)
 import Prelude (putStrLn)
 import Lang.Types
+import Data.Aeson
+import Lang.JLang
 
 langSpec :: Spec
 langSpec = do
@@ -143,3 +147,10 @@ interpretJRes = do
     it "same_result_with_two_interpreters" $ property
         (\(RandCodaRCO old cv) -> 
             dummyInterpret cv `shouldBe` dummyInterpretWJRes (testTypeCheck old) cv)
+
+jlangJSONSpec :: Spec
+jlangJSONSpec = do
+    it "parse_to_and_from_JSON_encode" $ property
+        (\(j :: JLang) -> j `shouldBe` (fromJust (decode (encode j))))
+    it "parse_to_and_fromJSON" $ property
+        (\(j :: JLang) -> j `shouldBe` (fromJust (decode (encode (toJSON j)))))
