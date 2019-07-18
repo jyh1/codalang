@@ -435,6 +435,7 @@ checkER v = case isERRes v of
 
 dummyInterpret = testInterpret
 dummyInterpretWIntfrc = testInterpretWIntrfc
+dummyInterpretWJRes = testInterpretWJRes
 
 checkInterpretRes :: (Eq a) => (a, CodaTestRes) ->  (a, CodaTestRes) -> Bool
 checkInterpretRes (l1s, r1) (l2s, r2) = 

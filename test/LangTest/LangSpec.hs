@@ -22,6 +22,7 @@ langSpec = do
     pprintSpec
     typeCheckSpec
     interpretInterface
+    interpretJRes
 
 parseSpec :: Spec
 parseSpec = describe "CodaVal_parser" $ do
@@ -136,3 +137,9 @@ interpretInterface = do
     it "same_result_with_two_interpreters" $ property
         (\(RandCodaRCO old cv) -> 
             dummyInterpret cv == dummyInterpretWIntfrc cv)
+
+interpretJRes :: Spec
+interpretJRes = do
+    it "same_result_with_two_interpreters" $ property
+        (\(RandCodaRCO old cv) -> 
+            dummyInterpret cv `shouldBe` dummyInterpretWJRes (testTypeCheck old) cv)

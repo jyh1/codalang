@@ -6,7 +6,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module LangTest.Interpret(testInterpret, testInterpretWIntrfc, CodaTestRes(..), CmdLog, makeDir) where
+module LangTest.Interpret(testInterpret, testInterpretWIntrfc, CodaTestRes(..), CmdLog, makeDir, testInterpretWJRes) where
 
 -- a dummy interpreter for CodaVal for testing purpose
 
@@ -14,15 +14,15 @@ import RIO hiding (to, view, traceShow, over)
 import Control.Lens
 import qualified RIO.Text as T
 import Control.Monad.State
-import RIO.List.Partial (head, tail)
 import qualified RIO.Map as M
-import Debug.Trace (traceShow)
+import RIO.List (foldl)
 
 import Lang.Types
 import Lang.Fold
 import Lang.Interpret
+import Lang.JLang
 
-data CodaTestRes = BunRes UUID 
+data CodaTestRes = BunRes Text 
     | RunRes [(Text, CodaTestRes)] [CodaTestRes] 
     | DirRes CodaTestRes [Text] 
     | StrRes Text 
@@ -57,7 +57,7 @@ instance GetCounter (CodaInterEnv CodaTestRes) InterApp
 instance LocalVar (CodaInterEnv CodaTestRes) InterApp CodaTestRes
 
 instance CodaLangEnv InterApp CodaTestRes where
-    lit = return . BunRes
+    lit t = return (BunRes (tshow t))
     str = return . StrRes
     var v = use (envL . at v . to (fromMaybe errmsg))
         where
@@ -96,7 +96,7 @@ instance CodaLangEnv InterApp CodaTestRes where
                     StrRes{} -> return val
                     _ -> runCat Nothing val
                 TypeBundle -> case val of
-                    StrRes s -> return (BunRes (BundleName s))
+                    StrRes s -> return (BunRes s)
                     DictRes dict -> do
                         resD <- mapM (`makeConvert` TypeBundle) dict
                         runMake Nothing (M.toList resD)
@@ -172,6 +172,16 @@ testInterpret cv = (_cmdlog env, res)
         app = foldCoda cv
         (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
 
+parseEle :: (TextMap CodaTestRes) -> CMDEle Text CodaTestRes -> CodaTestRes
+parseEle deps ele
+    -- | traceShow eleDep False = undefined 
+    -- | length paths == 1 = StrRes ele
+    | otherwise = case ele of
+        Plain t -> t
+        BundleRef eleVar ps -> 
+            let eleDep = view (at eleVar . to (fromMaybe undefined)) deps in 
+                fromDirRes eleDep ps
+
 -- use interpret interface (after RCO)
 instance Exec InterApp CodaTestRes where
     clRun opts deps cmd = do
@@ -179,21 +189,14 @@ instance Exec InterApp CodaTestRes where
         -- c <- getCounter
         return (RunRes (_clOpt opts) resCmd)
         where
-            resCmd = parseEle <$> cmd
-            parseEle ele
-                -- | traceShow eleDep False = undefined 
-                -- | length paths == 1 = StrRes ele
-                | otherwise = case ele of
-                    Plain t -> t
-                    BundleRef eleVar ps -> 
-                        let eleDep = view (at eleVar . to (fromMaybe undefined)) deps in 
-                            fromDirRes eleDep ps
+            resCmd = parseEle deps <$> cmd
+
                             
-    clLit _ u = return (BunRes u)
+    clLit _ u = return (BunRes (tshow u))
     clCat opts v = StrRes <$> runCatTxt (Just (_clOpt opts)) v
     clMake opts ks = runMake (Just (_clOpt opts)) ks
     strLit s = return (StrRes s)
-    fromBundleName (StrRes s) = return (BunRes (BundleName s))
+    fromBundleName (StrRes s) = return (BunRes s)
     execDir d p = return (fromDirRes d [p])
     execRec dict = return (DictRes dict)
 
@@ -210,3 +213,62 @@ testInterpretWIntrfc cv = (_cmdlog env, res)
         app :: InterApp CodaTestRes
         app = evalCoda cv
         (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
+
+
+testInterpretWJRes :: CodaType -> TestInterpret
+testInterpretWJRes t v = (_cmdlog env, res)
+    where
+        app :: InterApp CodaTestRes
+        app = fromJRes t (compileJ v)
+        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
+
+fromJRes :: CodaType -> (JRes, [JBlock JRes]) -> InterApp CodaTestRes
+fromJRes t (res, blks) = do
+    mapM evalBlk blks
+    evalResJRes t res
+evalBlk :: JBlock JRes -> InterApp ()
+evalBlk (JBlock v opt cmd) = do
+    optVal <- (traverse . _2) evalStrJRes opt
+    res <- case cmd of
+        JCat r -> do
+            tres <- evalBunJRes r
+            StrRes <$> runCatTxt (Just optVal) tres
+        JMake ts -> do
+            tres <- (traverse . _2) evalBunJRes ts
+            runMake (Just optVal) tres
+        JRun deps cmds -> do
+            cmdRes <- mapM fromCMDEle cmds
+            depRes <- mapM evalBunJRes (M.fromList deps)
+            let resCmd = parseEle depRes <$> cmdRes
+            cmdlog %= ((optVal, LogRun resCmd) :)
+            return (RunRes optVal resCmd)
+        JLit v -> evalBunJRes v
+    envL . at v ?= res
+
+fromCMDEle :: CMDEle Text JRes -> InterApp (CMDEle Text CodaTestRes)
+fromCMDEle e = case e of
+    Plain t -> Plain <$> evalStrJRes t
+    BundleRef b ps -> return (BundleRef b ps)
+    
+
+evalStrJRes :: JRes -> InterApp CodaTestRes
+evalStrJRes r = case r of
+    JVerbatim t -> return (StrRes t)
+    JVariable v -> use (envL . at v . to (fromMaybe undefined))
+
+evalBunJRes :: JRes -> InterApp CodaTestRes
+evalBunJRes r = case r of
+    JVerbatim t -> return (BunRes t)
+    JVariable v -> do
+        res <- use (envL . at v . to (fromMaybe undefined))
+        return $ case res of
+            StrRes k -> BunRes k
+            _ -> res
+    JDir d ps -> (\d -> fromDirRes d ps) <$> evalBunJRes d
+
+evalResJRes :: CodaType -> JRes -> InterApp CodaTestRes
+evalResJRes TypeString r = evalStrJRes r
+evalResJRes TypeBundle r = evalBunJRes r
+evalResJRes (TypeRecord d) r = case r of
+    JRec rm -> DictRes <$> sequence (M.intersectionWith evalResJRes d rm)
+    _ -> evalBunJRes r
