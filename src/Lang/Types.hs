@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -18,7 +18,11 @@ import Data.Aeson
 
 -- UUID of CodaLab bundle
 data UUID = UUID Text | BundleName Text
-    deriving (Eq, Ord, Read)
+    deriving (Eq, Ord, Read, Generic)
+instance FromJSON UUID
+instance ToJSON UUID where
+    toEncoding = genericToEncoding defaultOptions
+
 
 instance Show UUID where
     show (UUID n) = "0x" ++ T.unpack n
@@ -29,7 +33,7 @@ type VarName = Text
 -- Codalab command
 
 data Cmd a = Run [a] | ClCat a | ClMake [(Text, a)]
-    deriving (Eq, Ord, Read, Show, Functor)
+    deriving (Eq, Ord, Read, Show, Functor, Generic)
 instance Foldable Cmd where
     foldMap f (ClCat a) = f a
     foldMap f (Run as) = foldMap f as
@@ -38,6 +42,10 @@ instance Traversable Cmd where
     traverse f (ClCat a) = ClCat <$> (f a)
     traverse f (Run as) = Run <$> (traverse f as)
     traverse f (ClMake rs) = ClMake <$> ((traverse . _2) f rs)
+instance (FromJSON a) => FromJSON (Cmd a) where
+instance (ToJSON a) => ToJSON (Cmd a) where
+    toEncoding = genericToEncoding defaultOptions
+
 
 type CodaCmd = Cmd CodaVal
 
@@ -47,7 +55,10 @@ type Env = [(Text, Text)]
 -- assign to let
 data AssignForm = Variable VarName
     | OptionVar VarName
-    deriving (Eq, Ord, Read, Show)
+    deriving (Eq, Ord, Read, Show, Generic)
+instance ToJSON AssignForm where
+    toEncoding = genericToEncoding defaultOptions
+instance FromJSON AssignForm
 
 printAssignForm :: AssignForm -> Text
 printAssignForm af = case af of
@@ -67,7 +78,11 @@ data CodaVal = Lit UUID
     | Dict (TextMap CodaVal)
     | Lambda TypeDict CodaVal
     | Apply CodaVal (TextMap CodaVal)
-    deriving (Eq, Ord, Read, Show)
+    deriving (Eq, Ord, Read, Show, Generic)
+
+instance FromJSON CodaVal
+instance ToJSON CodaVal where
+    toEncoding = genericToEncoding defaultOptions
 
 makeCl :: CodaCmd -> CodaVal
 makeCl = Cl []
@@ -81,7 +96,11 @@ tmpName = "codalang"
 type TextMap = Map Text
 type TypeDict = TextMap CodaType
 data CodaType = TypeString | TypeBundle | TypeRecord TypeDict | TypeLam TypeDict CodaType
-    deriving (Eq, Ord, Read, Show)
+    deriving (Eq, Ord, Read, Show, Generic)
+
+instance ToJSON CodaType where
+    toEncoding = genericToEncoding defaultOptions
+instance FromJSON CodaType where
 
 containLambda :: CodaType -> Bool
 containLambda ty = case ty of
