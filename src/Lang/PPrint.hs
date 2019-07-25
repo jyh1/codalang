@@ -105,20 +105,18 @@ instance CodaLangEnv PPPass PPrint where
     cl optEnv cmd
         | not (null optEnv) = 
             foldr ($) (cl [] cmd) [ clet (OptionVar optVar) (return optVal) | (optVar, optVal) <- optEnv]
-        | otherwise = case cmd of
-            -- Run cmd -> do
-            --     cs <- sequence cmd
-            --     let cs' = toAnnoDoc <$> cs
-            --         lpr = flatAlt ("(" <> line <> "  ") "("
-            --         rpr = (flatAlt (line <> ")") ")")
-            --         s = ", "
-            --         runeles = align $ case cs' of
-            --             [] -> error "PPrint: empty run command"
-            --             [e] -> lpr <> e <> comma <> rpr
-            --             _ -> cat (zipWith (<>) (lpr : repeat s) cs') <> rpr
-            --     ranno RunAnno (group runeles)
-            ClCat val -> val >>= (\v -> convert Nothing v TypeString)
-            ClMake ks -> dict (M.fromList ks) >>= (\v -> convert Nothing v TypeBundle)
+        | otherwise = do
+            cmd' <- sequence cmd
+            case cmd' of
+                Run cs -> do
+                    let 
+                        cs' = fromCMDEle annoExpr annoPlain <$> cs
+                        lpr = "@"
+                        rpr = "@"
+                        runeles = align $ (lpr <> mconcat cs' <> rpr)
+                    ranno RunAnno (group runeles)
+                -- ClCat val -> val >>= (\v -> convert Nothing v TypeString)
+                -- ClMake ks -> dict (M.fromList ks) >>= (\v -> convert Nothing v TypeBundle)
     dir bval sub = 
         ranno DirAnno (toAnnoDocWithParen bval <> "/" <> pretty sub)
     clet as val body = do
@@ -139,6 +137,15 @@ instance CodaLangEnv PPPass PPrint where
     lambda ad body = PLambda (argAnno (textMap (pretty <$> ad))) <$> (toAnnoDoc <$> foldCoda body)
     apply f arg = 
         return (PApply (toAnnoDocWithParen f) (argAnno (textMap (toAnnoDoc <$> arg))))
+
+annoPlain :: Text -> AnnoDoc
+annoPlain t = pretty (concat (map escChar s))
+    where
+        s = T.unpack t
+        escChar c = bool [c] (['\\', c]) (c == '\\' || c == '@' || c == '$')
+
+annoExpr :: PPrint -> AnnoDoc
+annoExpr d = "${" <> toAnnoDoc d <> "}"
 
 codaToDoc :: CodaVal -> AnnoDoc
 codaToDoc cv = toAnnoDoc res

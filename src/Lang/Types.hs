@@ -155,6 +155,11 @@ buildPath = T.intercalate "/"
 data CMDEle a b = CMDExpr a | Plain b 
     deriving (Show, Read, Eq, Ord)
 
+fromCMDEle :: (a -> c) -> (b -> c) -> (CMDEle a b) -> c
+fromCMDEle cmd plain e = case e of
+    CMDExpr a -> cmd a
+    Plain b -> plain b
+
 cmdExpr :: Prism (CMDEle a c) (CMDEle b c) a b
 cmdExpr = prism CMDExpr extract
     where

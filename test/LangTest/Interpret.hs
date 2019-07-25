@@ -57,9 +57,7 @@ instance GetCounter (CodaInterEnv CodaTestRes) InterApp
 instance LocalVar (CodaInterEnv CodaTestRes) InterApp CodaTestRes
 
 evalCmdEle :: CMDEle CodaTestRes Text -> CodaTestRes
-evalCmdEle e = case e of
-    CMDExpr a -> a
-    Plain t -> StrRes t
+evalCmdEle = fromCMDEle id StrRes
 
 instance CodaLangEnv InterApp CodaTestRes where
     lit t = return (BunRes (tshow t))
@@ -243,7 +241,7 @@ evalBlk (JBlock v opt cmd) = do
             tres <- (traverse . _2) evalBunJRes ts
             runMake (Just optVal) tres
         JRun deps cmds -> do
-            cmdRes <- mapM fromCMDEle cmds
+            cmdRes <- mapM fromCMDJEle cmds
             depRes <- mapM evalBunJRes (M.fromList deps)
             let resCmd = parseEle depRes <$> cmdRes
             cmdlog %= ((optVal, LogRun resCmd) :)
@@ -251,8 +249,8 @@ evalBlk (JBlock v opt cmd) = do
         JLit v -> return (BunRes v)
     envL . at v ?= res
 
-fromCMDEle :: CMDEle Text JRes -> InterApp (CMDEle Text CodaTestRes)
-fromCMDEle e = case e of
+fromCMDJEle :: CMDEle Text JRes -> InterApp (CMDEle Text CodaTestRes)
+fromCMDJEle e = case e of
     Plain t -> Plain <$> evalStrJRes t
     CMDExpr b -> return (CMDExpr b)
     
