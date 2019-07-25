@@ -135,7 +135,7 @@ randCl = makeCl <$> randCmd
     randCmd = do
       cmdeles <- (`replicate` (pickType >>= randTree)) <$> lift (choose (1, 6))
       geneles <- zipWithM ($) reduceDepth cmdeles
-      return (Run geneles)
+      return (Run (CMDExpr <$> geneles))
       where
         pickType = lift (elements [TypeBundle, TypeString])
         reduceDepth = decDepth : decDepth : repeat halfDepth
@@ -335,7 +335,7 @@ v :: VarName -> CodaVal
 v = Var
 c :: CodaCmd -> CodaVal
 c = makeCl
-r = makeCl . Run
+r = makeCl . Run . (map CMDExpr)
 l = Lit . UUID
 d :: CodaVal -> [Text] -> CodaVal
 d = foldl Dir
@@ -381,7 +381,7 @@ isCMD :: RCOCheck
 isCMD (Cl oe cmd ) = sequence_ [(traverse_ . _2) isValue oe, cmdTest]
   where 
     cmdTest = case cmd of
-      Run as -> sequence_ (isRunCmdEle <$> as)
+      -- Run as -> sequence_ (isRunCmdEle <$> as)
       ClCat v -> isBundle v
       ClMake{} -> traverse_ isBundle cmd
 isCMD v = showError "isCMD" v

@@ -52,7 +52,7 @@ prepLetRhs vn cv = case cv of
         opts <- (traverse . _2) runCodaRes optEnv
         let clinfo = ClInfo vn opts
         case clcmd of
-            Run cmd -> processRun clinfo cmd
+            -- Run cmd -> processRun clinfo cmd
             ClCat val -> do
                 valDep <- runCodaRes val
                 lift (RuntimeString <$> clCat clinfo valDep)

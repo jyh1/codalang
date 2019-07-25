@@ -106,17 +106,17 @@ instance CodaLangEnv PPPass PPrint where
         | not (null optEnv) = 
             foldr ($) (cl [] cmd) [ clet (OptionVar optVar) (return optVal) | (optVar, optVal) <- optEnv]
         | otherwise = case cmd of
-            Run cmd -> do
-                cs <- sequence cmd
-                let cs' = toAnnoDoc <$> cs
-                    lpr = flatAlt ("(" <> line <> "  ") "("
-                    rpr = (flatAlt (line <> ")") ")")
-                    s = ", "
-                    runeles = align $ case cs' of
-                        [] -> error "PPrint: empty run command"
-                        [e] -> lpr <> e <> comma <> rpr
-                        _ -> cat (zipWith (<>) (lpr : repeat s) cs') <> rpr
-                ranno RunAnno (group runeles)
+            -- Run cmd -> do
+            --     cs <- sequence cmd
+            --     let cs' = toAnnoDoc <$> cs
+            --         lpr = flatAlt ("(" <> line <> "  ") "("
+            --         rpr = (flatAlt (line <> ")") ")")
+            --         s = ", "
+            --         runeles = align $ case cs' of
+            --             [] -> error "PPrint: empty run command"
+            --             [e] -> lpr <> e <> comma <> rpr
+            --             _ -> cat (zipWith (<>) (lpr : repeat s) cs') <> rpr
+            --     ranno RunAnno (group runeles)
             ClCat val -> val >>= (\v -> convert Nothing v TypeString)
             ClMake ks -> dict (M.fromList ks) >>= (\v -> convert Nothing v TypeBundle)
     dir bval sub = 

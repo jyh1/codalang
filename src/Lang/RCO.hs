@@ -233,10 +233,10 @@ instance CodaLangEnv RCOPass RCORes where
                 (  "The impossible happened: undefined variable in RCO: "
                 ++ T.unpack v
                 )
-    cl _ (Run cmd) = do
-        optEnv <- use (optvar . to M.toList)
-        RCOCmd optEnv <$> rcocmd
-        where rcocmd = Run <$> traverse (>>= rcoLet) cmd
+    -- cl _ (Run cmd) = do
+    --     optEnv <- use (optvar . to M.toList)
+    --     RCOCmd optEnv <$> rcocmd
+    --     where rcocmd = Run <$> traverse (>>= rcoLet) cmd
     dir val subdir = toSubDir val subdir
     clet af val body = case af of
         Variable vname -> do

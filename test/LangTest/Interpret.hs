@@ -65,9 +65,9 @@ instance CodaLangEnv InterApp CodaTestRes where
     cl optVals clcmd = do
         cmd <- sequenceA clcmd
         let execcmd = case cmd of
-                Run cmd' -> do
-                    oe <- makeLog Nothing (LogRun cmd')
-                    return (RunRes oe cmd')
+                -- Run cmd' -> do
+                --     oe <- makeLog Nothing (LogRun cmd')
+                --     return (RunRes oe cmd')
                 ClCat val -> runCat Nothing val
                 ClMake val -> runMake Nothing val
         if null optVals then execcmd else 

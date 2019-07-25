@@ -11,7 +11,7 @@
 
 module Lang.Types where
 
-import           RIO
+import           RIO hiding (over)
 import qualified RIO.Text as T
 import qualified RIO.Map as M
 import           Control.Lens hiding ((.=))
@@ -33,15 +33,20 @@ type VarName = Text
 
 -- Codalab command
 
-data Cmd a = Run [a] | ClCat a | ClMake [(Text, a)]
-    deriving (Eq, Ord, Read, Show, Functor, Generic)
+data Cmd a = Run [CMDEle a Text] | ClCat a | ClMake [(Text, a)]
+    deriving (Eq, Ord, Read, Show, Generic)
+instance Functor Cmd where
+    fmap f cmd = case cmd of
+        ClCat a -> ClCat (f a)
+        ClMake xs -> ClMake (fmap (fmap f) xs)
+        Run xs -> Run (over (traverse . cmdExpr) f xs)
 instance Foldable Cmd where
     foldMap f (ClCat a) = f a
-    foldMap f (Run as) = foldMap f as
-    foldMap f (ClMake rs) = foldMap (foldMap f) rs
+    foldMap f (Run as) = foldMapOf (traverse . cmdExpr) f as
+    foldMap f (ClMake rs) = foldMapOf (traverse . _2) f rs
 instance Traversable Cmd where
     traverse f (ClCat a) = ClCat <$> (f a)
-    traverse f (Run as) = Run <$> (traverse f as)
+    traverse f (Run as) = Run <$> ((traverse . cmdExpr) f as)
     traverse f (ClMake rs) = ClMake <$> ((traverse . _2) f rs)
 instance (FromJSON a) => FromJSON (Cmd a) where
 instance (ToJSON a) => ToJSON (Cmd a) where
@@ -149,6 +154,13 @@ buildPath = T.intercalate "/"
 
 data CMDEle a b = CMDExpr a | Plain b 
     deriving (Show, Read, Eq, Ord)
+
+cmdExpr :: Prism (CMDEle a c) (CMDEle b c) a b
+cmdExpr = prism CMDExpr extract
+    where
+        extract e = case e of
+            CMDExpr a -> Right a
+            Plain b -> Left (Plain b)
 
 tagType :: (KeyValue kv) => Text -> kv
 tagType t = "type" .= t

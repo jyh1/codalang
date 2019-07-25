@@ -23,6 +23,7 @@ import           Text.Parser.Char               ( char )
 import           Text.Parser.Token.Highlight
 import           Text.Trifecta
 import           Data.Char (isSpace)
+import           Control.Lens (unto)
 
 data PAssign = PLetVar Text | PLetOpt Text | PLetFun Text TypeDict
     deriving (Show, Read, Eq, Ord)
@@ -77,7 +78,7 @@ fromParseRes res = case res of
     PLet as body -> foldr (uncurry fromPLet)
                           (fromParseRes body)
                           as
-    PRun ps   -> (makeCl . Run) <$> (mapM fromParseRes ps)
+    PRun ps   -> (makeCl . Run) <$> (mapM (\x -> CMDExpr <$> fromParseRes x) ps)
     PDir home subs -> (`Dir` subs) <$> fromParseRes home
     PConv val ts -> case ts of
         [] -> fromParseRes val
