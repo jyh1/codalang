@@ -87,15 +87,14 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
       where
         err = throwErr (TypeError UnDef (Var vn))
     str k = return (makeRes TypeString (Str k))
-    -- cl _ (Run es) = do
-    --     es' <- sequence es
-    --     mapM_ notRecord es'
-    --     return (makeRun <$> (coSequenceT TypeBundle es'))
-    --     where
-    --         makeRun = makeCl . Run
-    --         notRecord t = case resType t of
-    --             ty@TypeRecord{} -> throwErr (TypeError (Mismatch TypeBundle ty) (resOrig t))
-    --             _ -> return ()
+    cl _ r@(Run es) = do
+        r' <- sequence r
+        mapM_ notRecord r'
+        return (makeCl <$> (coSequenceT TypeBundle r'))
+        where
+            notRecord t = case resType t of
+                ty@TypeRecord{} -> throwErr (TypeError (Mismatch TypeBundle ty) (resOrig t))
+                _ -> return ()
     cl _ (ClCat _) = error "Cat command during type check"
     dir val sub = case resType val of
         TypeString -> throwErr (TypeError (Mismatch TypeBundle TypeString) ast)
@@ -113,6 +112,7 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
             OptionVar{} -> 
                 expectType TypeString (resType valRes) (resOrig valRes) >> body
         return (liftRes2 (Let af) valRes bodyRes)
+
     -- deprecated
     convert _ val vt = bool castErr doConvert isConvertable
         where

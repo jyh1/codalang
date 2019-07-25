@@ -80,7 +80,7 @@ parseSpec = describe "CodaVal_parser" $ do
     it "dictionary" $ do
         parseSucc "{xx:0x1}" (dict [("xx", l "1")])
         parseSucc "{x:0x1, y:0x02/a}" (dict [("x", l "1"), ("y", d (l "02") ["a"])])
-    -- parserQuickCheck
+    parserQuickCheck
 
 -- randomly generate codaval and randomly serilize to string, parser sould be able to parse it back
 parserQuickCheck :: Spec

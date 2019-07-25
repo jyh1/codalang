@@ -56,6 +56,11 @@ instance GetCounter (CodaInterEnv CodaTestRes) InterApp
 
 instance LocalVar (CodaInterEnv CodaTestRes) InterApp CodaTestRes
 
+evalCmdEle :: CMDEle CodaTestRes Text -> CodaTestRes
+evalCmdEle e = case e of
+    CMDExpr a -> a
+    Plain t -> StrRes t
+
 instance CodaLangEnv InterApp CodaTestRes where
     lit t = return (BunRes (tshow t))
     str = return . StrRes
@@ -65,9 +70,10 @@ instance CodaLangEnv InterApp CodaTestRes where
     cl optVals clcmd = do
         cmd <- sequenceA clcmd
         let execcmd = case cmd of
-                -- Run cmd' -> do
-                --     oe <- makeLog Nothing (LogRun cmd')
-                --     return (RunRes oe cmd')
+                Run cmd' -> do
+                    let cmdEles = evalCmdEle <$> cmd'
+                    oe <- makeLog Nothing (LogRun cmdEles)
+                    return (RunRes oe cmdEles)
                 ClCat val -> runCat Nothing val
                 ClMake val -> runMake Nothing val
         if null optVals then execcmd else 
