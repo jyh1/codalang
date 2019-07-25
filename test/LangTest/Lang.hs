@@ -335,7 +335,10 @@ v :: VarName -> CodaVal
 v = Var
 c :: CodaCmd -> CodaVal
 c = makeCl
-r = makeCl . Run . (map CMDExpr)
+r = clrun . (map CMDExpr)
+clrun = makeCl . Run
+p = Plain
+ce = CMDExpr
 l = Lit . UUID
 d :: CodaVal -> [Text] -> CodaVal
 d = foldl Dir

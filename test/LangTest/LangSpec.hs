@@ -48,17 +48,21 @@ parseSpec = describe "CodaVal_parser" $ do
     let aapy = d "aa" ["run.py"]
         aapyCmd = r [aapy]
     it "cmd_expr" $ do
-        parseSucc "(0x0005/run.py,)" (r [d (l "0005") ["run.py"]])
-        parseSucc "(0x00005/run.py, \"-k\")" (r [d (l "00005") ["run.py"], s "-k"])
-        parseSucc "(aa/run.py, bb, \"cc\")" (r [aapy, "bb", s "cc"])
+        parseSucc "'$(0x0005/run.py)'" (r [d (l "0005") ["run.py"]])
+        parseSucc "'$(0x00005/run.py) -k'" (clrun [ce (d (l "00005") ["run.py"]), p " -k"])
+        parseSucc "'$(0x00005)/run.py -k'" (clrun [ce (l "00005"), p "/run.py -k"])
+        parseSucc "'$(   0x00005)/run.py -k'" (clrun [ce (l "00005"), p "/run.py -k"])
+        parseSucc "'$(   0x00005/run.py    )/run.py -k'" (clrun [ce (d (l "00005") ["run.py"]), p "/run.py -k"])
+        parseSucc "' $(aa/run.py ) bb cc'/a" (d (clrun [p  " ", ce aapy, p " bb cc"]) ["a"])
+        parseSucc "'$('$( 0x0005/run.py )') '" (clrun [ce (r [d (l "0005") ["run.py"]]), p " "])
+        parseSucc "'$xy1/a'" (clrun [ce (v "xy1"), p "/a"])
     it "simple_let_expr" $ do
         parseSucc "let x = y in x" (clet "x" [("x", "y")])
         parseSucc "  let x=0x02 in x" (clet "x" [("x", (l "02"))])
-        parseSucc "let x=(aa/run.py,) in y" (clet "y" [("x", aapyCmd)])
-        parseSucc "let x =  (aa/run.py); y=(aa/run.py,) in (x, y)" (clet (r ["x", "y"]) [("x", aapy), ("y", aapyCmd)])
+        parseSucc "let x =  (aa/run.py); y=(aa/run.py) in x" (clet "x" [("x", aapy), ("y", aapy)])
     it "nested_let_expr" $ do
         parseSucc "let x = let y = 0x1 in y in x" (clet "x" [("x", clet "y" [("y", 1)])])
-        parseSucc "(let x = 0x0002 in x/a/b, let x=0x01; y= \" x\" in (x, y)/x)"
+        parseSucc "'$(let x = 0x0002 in x/a/b)$(let x=0x01; y= \" x\" in '$x$y'/x)'"
             (r [clet (d "x" ["a", "b"]) [("x", (l "0002"))], clet (d (r ["x", "y"]) ["x"]) [("x", (l "01")), ("y", s " x")]])
     -- deprecated
     -- it "type_annotation" $ do
@@ -73,7 +77,7 @@ parseSpec = describe "CodaVal_parser" $ do
     it "dictionary" $ do
         parseSucc "{xx:0x1}" (dict [("xx", l "1")])
         parseSucc "{x:0x1, y:0x02/a}" (dict [("x", l "1"), ("y", d (l "02") ["a"])])
-    parserQuickCheck
+    -- parserQuickCheck
 
 -- randomly generate codaval and randomly serilize to string, parser sould be able to parse it back
 parserQuickCheck :: Spec
