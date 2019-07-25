@@ -56,6 +56,9 @@ parseSpec = describe "CodaVal_parser" $ do
         parseSucc "' $(aa/run.py ) bb cc'/a" (d (clrun [p  " ", ce aapy, p " bb cc"]) ["a"])
         parseSucc "'$('$( 0x0005/run.py )') '" (clrun [ce (r [d (l "0005") ["run.py"]]), p " "])
         parseSucc "'$xy1/a'" (clrun [ce (v "xy1"), p "/a"])
+        parseSucc "'$xy1/a \\'a b\\' '" (clrun [ce (v "xy1"), p "/a 'a b' "])
+        parseSucc "'$xy1/a \\$(a b) '" (clrun [ce (v "xy1"), p "/a $(a b) "])
+        parseSucc "'$xy1/a \\\\\\'a b\\\\\\' '" (clrun [ce (v "xy1"), p "/a \\'a b\\' "])
     it "simple_let_expr" $ do
         parseSucc "let x = y in x" (clet "x" [("x", "y")])
         parseSucc "  let x=0x02 in x" (clet "x" [("x", (l "02"))])
@@ -77,7 +80,7 @@ parseSpec = describe "CodaVal_parser" $ do
     it "dictionary" $ do
         parseSucc "{xx:0x1}" (dict [("xx", l "1")])
         parseSucc "{x:0x1, y:0x02/a}" (dict [("x", l "1"), ("y", d (l "02") ["a"])])
-    -- parserQuickCheck
+    parserQuickCheck
 
 -- randomly generate codaval and randomly serilize to string, parser sould be able to parse it back
 parserQuickCheck :: Spec

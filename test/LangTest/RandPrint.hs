@@ -135,11 +135,17 @@ spaces = resize 2 (listOf space)
 encloseSpaces :: String -> Gen String
 encloseSpaces s = liftA2 (\s1 s2 -> s1 ++ s ++ s2) spaces spaces
 
+escCmdStr :: Char -> String
+escCmdStr c = case c of
+    '\\' -> "\\\\"
+    '$' -> "\\$"
+    '\'' -> "\\'"
+
 rendCmdEle :: (CMDEle CodaVal Text) -> RendCoda
 rendCmdEle (CMDExpr a) = case a of
     Var v -> RLis [Symbol "$", Symbol v]
     _ -> RLis [Symbol "$", TightParens1 (rendCoda a)]
-rendCmdEle (Plain a) = Symbol a
+rendCmdEle (Plain a) = Symbol (T.pack (concatMap escCmdStr (T.unpack a)))
 
 rendCoda :: CodaVal -> RendCoda
 rendCoda cv = case cv of
