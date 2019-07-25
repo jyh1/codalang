@@ -32,7 +32,7 @@ data ParseRes = PLit Text
     | PVar Text
     | PStr Text
     | PLet [(PAssign, ParseRes)] ParseRes
-    | PRun [ParseRes]
+    | PRun [CMDEle ParseRes Text]
     | PDir ParseRes Text
     | PConv ParseRes [CodaType]
     | PDict (Map Text ParseRes)
@@ -78,7 +78,7 @@ fromParseRes res = case res of
     PLet as body -> foldr (uncurry fromPLet)
                           (fromParseRes body)
                           as
-    PRun ps   -> (makeCl . Run) <$> (mapM (\x -> CMDExpr <$> fromParseRes x) ps)
+    PRun ps   -> (makeCl . Run) <$> ((traverse . cmdExpr) fromParseRes ps)
     PDir home subs -> (`Dir` subs) <$> fromParseRes home
     PConv val ts -> case ts of
         [] -> fromParseRes val
@@ -156,16 +156,27 @@ followedByList p sep after = token $ do
         (Just <$> (sep *> sepBy after sep)) <|> pure Nothing
     return (e1, rest)
 
--- | A run bundle or (expr)
--- | run bundle: (e1, ) (e1, e2, ...)
+-- | (expr)
 -- | expr: (e)
 parenExpr :: (TokenParsing m) => m ParseRes
 parenExpr = highlight Special (token (parens inside)) <?> "paren expression"
   where
-    inside = uncurry makeRun <$> followedByList codaExpr comma codaExpr
-    makeRun :: ParseRes -> Maybe [ParseRes] -> ParseRes
-    makeRun e1 Nothing   = e1
-    makeRun e1 (Just es) = PRun (e1 : es)
+    inside = token codaExpr
+    -- inside = uncurry makeRun <$> followedByList codaExpr comma codaExpr
+    -- makeRun :: ParseRes -> Maybe [ParseRes] -> ParseRes
+    -- makeRun e1 Nothing   = e1
+    -- makeRun e1 (Just es) = PRun (e1 : es)
+
+-- run command
+commandExpr :: (TokenParsing m) => m ParseRes
+commandExpr = token (highlight StringLiteral (PRun <$> runCommand))
+    where
+        plainLetter = satisfy (\c -> (c /= '\'') && (c /= '$') && (c > '\026'))
+        plainText = (Plain . T.pack) <$> some plainLetter
+        embedParens = nesting . between (symbolic '(') (char ')')
+        embedExpr = CMDExpr <$> (char '$' *> (varExpr <|> embedParens (token codaExpr)))
+        runCommand = between (char '\'') (char '\'' <?> "end of command") (some (plainText <|> embedExpr))
+            <?> "command"
 
 stringExpr :: (TokenParsing m) => m ParseRes
 stringExpr = PStr <$> stringLiteral
@@ -189,7 +200,7 @@ suffixExpr = highlight LiterateSyntax (token suffixParse) <?> "codalang expressi
 
 normalExpr :: (TokenParsing m) => m ParseRes
 normalExpr =
-    (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr <|> pdictExpr <|> loadExpr)
+    (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr <|> pdictExpr <|> loadExpr <|> commandExpr)
         <?> "regular codalang expression"
 
 
