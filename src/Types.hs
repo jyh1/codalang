@@ -148,7 +148,7 @@ consOptionList (ClInfo vname optList) = ("name", vname) : optList
 fromEle :: CMDEle Text Text -> Text
 fromEle e = case e of
     Plain t        -> t
-    BundleRef r ps -> buildPath (r:ps)
+    CMDExpr r -> r
       
 parseUUID :: ByteString -> RIO App Text
 parseUUID res = do

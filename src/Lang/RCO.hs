@@ -14,7 +14,7 @@ where
     -- record := {text : value}
     -- str := string | var
     -- value := bundle | str | var
-    -- cmdRCO := Cmd value
+    -- cmdRCO := Cmd (var | string)
     -- dirRCO := Dir bundle text
     -- convert := Convert _ (value) TypeBundle
     -- letRCO := Let var (cmdRCO | dirRCO | lit | str | convert | record) rco
@@ -236,7 +236,7 @@ instance CodaLangEnv RCOPass RCORes where
     cl _ (Run cmd) = do
         optEnv <- use (optvar . to M.toList)
         RCOCmd optEnv <$> rcocmd
-        where rcocmd = Run <$> traverse (>>= rcoValue) cmd
+        where rcocmd = Run <$> traverse (>>= rcoLet) cmd
     dir val subdir = toSubDir val subdir
     clet af val body = case af of
         Variable vname -> do

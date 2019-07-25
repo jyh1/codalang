@@ -40,12 +40,7 @@ makeKV x = case x of
     JVerbatim t -> [tagType "value", tagContent t]
     JDir b ps -> [tagType "dir", tagContent (object ["root" .= b, "path" .= ps])]
     JRec tm -> [tagType "record", tagContent (object ((uncurry (.=)) <$> (M.toList tm)))]
-tagType :: (KeyValue kv) => Text -> kv
-tagType t = "type" .= t
-tagContent :: (KeyValue kv, ToJSON a) => a -> kv
-tagContent t = "content" .= t
-doEncode :: [Series] -> Encoding
-doEncode ts = pairs (mconcat ts)
+
 instance ToJSON JRes where
     toJSON x = object (makeKV x)
     toEncoding x = doEncode (makeKV x)

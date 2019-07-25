@@ -84,11 +84,11 @@ processRun inf cmd = do
                 vres <- lookupVar v
                 return $ case vres of
                     RuntimeString s -> (Plain s, [])
-                    RuntimeBundle b -> (BundleRef b [], [(b, v)])
-            Dir{} -> do
-                v <- runCodaRes (Var dirRoot)
-                return (BundleRef v path, [(v, dirRoot)])
-                where (dirRoot, path) = getPath [] ele
+                    RuntimeBundle b -> (CMDExpr b, [(b, v)])
+            -- Dir{} -> do
+            --     v <- runCodaRes (Var dirRoot)
+            --     return (CMDExpr v, [(v, dirRoot)])
+            --     where (dirRoot, path) = getPath [] ele
             _ -> error "Impossible happened: arguments in run"
         rmDupDep :: (Ord c, Ord a) => [CMDEle a b] -> [(a, c)] -> ([CMDEle c b], Map c a)
         rmDupDep txtCmd deps = (depToVar <$> txtCmd, varVal)
@@ -96,7 +96,7 @@ processRun inf cmd = do
                 valVar = M.fromList deps
                 depToVar ele = case ele of
                     Plain s -> Plain s
-                    BundleRef dep ps -> BundleRef uniqVar ps
+                    CMDExpr dep -> CMDExpr uniqVar
                         where uniqVar = maybe undefined id (M.lookup dep valVar)
                 varVal = M.fromList (swap <$> M.toList valVar)
 

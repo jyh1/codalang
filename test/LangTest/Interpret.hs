@@ -178,9 +178,9 @@ parseEle deps ele
     -- | length paths == 1 = StrRes ele
     | otherwise = case ele of
         Plain t -> t
-        BundleRef eleVar ps -> 
+        CMDExpr eleVar -> 
             let eleDep = view (at eleVar . to (fromMaybe undefined)) deps in 
-                fromDirRes eleDep ps
+                eleDep
 
 -- use interpret interface (after RCO)
 instance Exec InterApp CodaTestRes where
@@ -248,7 +248,7 @@ evalBlk (JBlock v opt cmd) = do
 fromCMDEle :: CMDEle Text JRes -> InterApp (CMDEle Text CodaTestRes)
 fromCMDEle e = case e of
     Plain t -> Plain <$> evalStrJRes t
-    BundleRef b ps -> return (BundleRef b ps)
+    CMDExpr b -> return (CMDExpr b)
     
 
 evalStrJRes :: JRes -> InterApp CodaTestRes

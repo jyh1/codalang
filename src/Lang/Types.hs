@@ -7,6 +7,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Lang.Types where
 
@@ -146,18 +147,31 @@ data Execute = ExecRun [(Text, Text)] [Text] ClOption
 buildPath :: [Text] -> Text
 buildPath = T.intercalate "/"
 
-data CMDEle a b = Plain b | BundleRef a [Text]
+data CMDEle a b = CMDExpr a | Plain b 
     deriving (Show, Read, Eq, Ord)
 
+tagType :: (KeyValue kv) => Text -> kv
+tagType t = "type" .= t
+tagContent :: (KeyValue kv, ToJSON a) => a -> kv
+tagContent t = "content" .= t
+doEncode :: [Series] -> Encoding
+doEncode ts = pairs (mconcat ts)
+makeCmdEleKV :: (KeyValue kv, ToJSON a, ToJSON b) => CMDEle a b -> [kv]
+makeCmdEleKV x = case x of
+    Plain b -> [tagContent b, tagType "plain"]
+    CMDExpr r -> [tagContent r, tagType "expr"]
 instance (ToJSON a, ToJSON b) => ToJSON (CMDEle a b) where
-    toJSON e = case e of
-        Plain b -> toJSON b
-        BundleRef r ps -> object ["root" .= r, "path" .= ps]
-
+    toJSON e = object (makeCmdEleKV e)
+    toEncoding e = doEncode (makeCmdEleKV e)
 instance (FromJSON a, FromJSON b) => FromJSON (CMDEle a b) where
-    parseJSON o@(Object v) = 
-        (BundleRef <$> v .: "root" <*> v .: "path") <|> (Plain <$> parseJSON o)
-    parseJSON rest = Plain <$> parseJSON rest
+    parseJSON o@(Object v) = do
+        ty :: Text <- v .: "type"
+        cont :: Value <- v .: "content"
+        case ty of
+            "plain" -> Plain <$> parseJSON cont
+            "expr" -> CMDExpr <$> parseJSON cont
+            _ -> fail ("Unkonw type in CMDEle: " ++ T.unpack ty)
+    parseJSON invalid = fail ("Error parsing CMDEle: " ++ show invalid)
 
 class (Monad m) => Exec m a where
     clRun :: (ClInfo a) -> TextMap a -> [CMDEle Text a] -> m a
