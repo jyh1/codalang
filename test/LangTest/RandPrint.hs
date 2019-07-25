@@ -140,11 +140,12 @@ escCmdStr c = case c of
     '\\' -> "\\\\"
     '$' -> "\\$"
     '\'' -> "\\'"
+    _ -> [c]
 
 rendCmdEle :: (CMDEle CodaVal Text) -> RendCoda
 rendCmdEle (CMDExpr a) = case a of
     Var v -> RLis [Symbol "$", Symbol v]
-    _ -> RLis [Symbol "$", TightParens1 (rendCoda a)]
+    _ -> RLis [Symbol "$(", (rendCoda a), Symbol ")"]
 rendCmdEle (Plain a) = Symbol (T.pack (concatMap escCmdStr (T.unpack a)))
 
 rendCoda :: CodaVal -> RendCoda

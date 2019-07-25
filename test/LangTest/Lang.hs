@@ -24,6 +24,7 @@ import Data.Text.Prettyprint.Doc.Render.Text(renderStrict)
 import Data.Text.Prettyprint.Doc (layoutCompact)
 import           Numeric                        ( showHex )
 import RIO
+import RIO.Char (isLetter, isDigit)
 import RIO.List (delete)
 import qualified RIO.Text as T
 import qualified RIO.Map as M
@@ -133,9 +134,18 @@ randCl = makeCl <$> randCmd
   where
     randCmd :: GenEnv CodaCmd
     randCmd = do
-      cmdeles <- (`replicate` (pickType >>= randTree)) <$> lift (choose (1, 6))
+      let
+        randCmdExpr = CMDExpr <$> (pickType >>= randTree)
+        notVarChar c = not (isLetter c || isDigit c || c == '.' || c == '-' || c == '_')
+        plainStr = liftA2 (:) (arbitraryPrintableChar `suchThat` notVarChar) (resize 5 (listOf arbitraryPrintableChar))
+        randCmdPlain = lift ((Plain . T.pack) <$> plainStr)
+        twoEle a b = liftA2 (\t1 t2 -> [t1, t2]) a b
+        plainExpr = twoEle randCmdPlain randCmdExpr
+        exprExpr = twoEle randCmdExpr randCmdExpr
+        randCmdEles = oneofGenEnv [plainExpr, exprExpr]
+      cmdeles <- (`replicate` randCmdEles) <$> lift (choose (1, 3))
       geneles <- zipWithM ($) reduceDepth cmdeles
-      return (Run (CMDExpr <$> geneles))
+      return (Run (concat geneles))
       where
         pickType = lift (elements [TypeBundle, TypeString])
         reduceDepth = decDepth : decDepth : repeat halfDepth

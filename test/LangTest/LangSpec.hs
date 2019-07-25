@@ -86,7 +86,7 @@ parseSpec = describe "CodaVal_parser" $ do
 parserQuickCheck :: Spec
 parserQuickCheck = describe "parser_quick_check" $ 
     it "parse back from randomly printed string" $ property $
-        quickCheckWith stdArgs{ maxSuccess = 300 } (\(ParserTest cv cvStr) -> testParse cvStr == (Just cv))
+        quickCheckWith stdArgs{ maxSuccess = 300 } (\(ParserTest cv cvStr) -> testParse cvStr `shouldBe` (Just cv))
 
 pprintC = putStrLn . testPPrint
 randomPrint = generate arbitrary >>= (\(RandCoda _ cv) -> pprintC cv)
