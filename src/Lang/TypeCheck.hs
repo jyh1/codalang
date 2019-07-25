@@ -113,6 +113,7 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
             OptionVar{} -> 
                 expectType TypeString (resType valRes) (resOrig valRes) >> body
         return (liftRes2 (Let af) valRes bodyRes)
+    -- deprecated
     convert _ val vt = bool castErr doConvert isConvertable
         where
             ty = resType val

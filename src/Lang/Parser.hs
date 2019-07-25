@@ -171,7 +171,7 @@ stringExpr = PStr <$> stringLiteral
 
 -- | e/sub1/sub2[...]/file1[...]
 suffixExpr :: (TokenParsing m) => m ParseRes
-suffixExpr = highlight LiterateSyntax (token suffixWithType) <?> "codalang expression"
+suffixExpr = highlight LiterateSyntax (token suffixParse) <?> "codalang expression"
   where
     filename :: (TokenParsing m) => m Text
     filename = T.pack <$> many fileNameChar <?> "file name"
@@ -183,7 +183,7 @@ suffixExpr = highlight LiterateSyntax (token suffixWithType) <?> "codalang expre
     praseSuffix = parseDir <|> parseApply
     applySuffixes e fs = foldr ($) e (reverse fs)
     suffixParse = token (liftA2 applySuffixes normalExpr (many praseSuffix))
-    suffixWithType = liftA2 PConv suffixParse (many typeAnnotation)
+    -- suffixWithType = liftA2 PConv suffixParse (many typeAnnotation)
 
 
 normalExpr :: (TokenParsing m) => m ParseRes
@@ -195,6 +195,7 @@ normalExpr =
 dictKey :: (TokenParsing m) => m Text
 dictKey = T.pack <$> (some fileNameChar) <?> "type dictionary key"
 
+-- deprecated
 typeAnnotation :: (TokenParsing m) => m CodaType
 typeAnnotation = hasAnnot <?> "type annotation"
     where

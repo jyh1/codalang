@@ -60,15 +60,16 @@ parseSpec = describe "CodaVal_parser" $ do
         parseSucc "let x = let y = 0x1 in y in x" (clet "x" [("x", clet "y" [("y", 1)])])
         parseSucc "(let x = 0x0002 in x/a/b, let x=0x01; y= \" x\" in (x, y)/x)"
             (r [clet (d "x" ["a", "b"]) [("x", (l "0002"))], clet (d (r ["x", "y"]) ["x"]) [("x", (l "01")), ("y", s " x")]])
-    it "type_annotation" $ do
-        let l2 = l "02"
-            l2xy = d l2 ["x", "y"]
-        parseSucc "0x02 as string" (cv l2 ts)
-        parseSucc "0x02 as {}" (cv l2 emptBd)
-        parseSucc "0x02 as bundle" (cv l2 abd)
-        parseSucc "0x02/x/y as string" (cv l2xy ts)
-        parseSucc "0x02/x/y as { a: string, b :{}}" (cv l2xy (bd [("a", ts), ("b", emptBd)]))
-        parseSucc "0x02/x/y as { a: string, b :bundle}" (cv l2xy (bd [("a", ts), ("b", abd)]))
+    -- deprecated
+    -- it "type_annotation" $ do
+    --     let l2 = l "02"
+    --         l2xy = d l2 ["x", "y"]
+    --     parseSucc "0x02 as string" (cv l2 ts)
+    --     parseSucc "0x02 as {}" (cv l2 emptBd)
+    --     parseSucc "0x02 as bundle" (cv l2 abd)
+    --     parseSucc "0x02/x/y as string" (cv l2xy ts)
+    --     parseSucc "0x02/x/y as { a: string, b :{}}" (cv l2xy (bd [("a", ts), ("b", emptBd)]))
+    --     parseSucc "0x02/x/y as { a: string, b :bundle}" (cv l2xy (bd [("a", ts), ("b", abd)]))
     it "dictionary" $ do
         parseSucc "{xx:0x1}" (dict [("xx", l "1")])
         parseSucc "{x:0x1, y:0x02/a}" (dict [("x", l "1"), ("y", d (l "02") ["a"])])
@@ -146,7 +147,7 @@ interpretJRes :: Spec
 interpretJRes = do
     it "same_result_with_two_interpreters" $ property
         (\(RandCodaRCO old cv) -> 
-            fst (dummyInterpret cv) `shouldBe` fst (dummyInterpretWJRes (testTypeCheck old) cv))
+            dummyInterpret cv `shouldBe` dummyInterpretWJRes (testTypeCheck old) cv)
 
 jlangJSONSpec :: Spec
 jlangJSONSpec = do

@@ -161,18 +161,22 @@ randLet t = do
       , (5, OptionVar <$> genVar)
       ]
 
+-- disable generate convert node
 randConvert :: CodaType -> GenEnv CodaVal
-randConvert t = do
-  let genType = extendType t
-          where
-            extendType t = case t of
-              TypeString -> elements [TypeString, TypeBundle]
-              TypeBundle -> randNoTypeLam
-              TypeRecord d -> oneof (bool [] [pure TypeBundle] (notLambda t) ++ [TypeRecord <$> mapM extendType d])
-              TypeLam{} -> specialize t
-  newt <- lift genType
-  val <- decDepth (randTree newt)
-  return (defConvert val t)
+randConvert t =
+  decDepth (randTree t)
+-- randConvert :: CodaType -> GenEnv CodaVal
+-- randConvert t = do
+--   let genType = extendType t
+--           where
+--             extendType t = case t of
+--               TypeString -> elements [TypeString, TypeBundle]
+--               TypeBundle -> randNoTypeLam
+--               TypeRecord d -> oneof (bool [] [pure TypeBundle] (notLambda t) ++ [TypeRecord <$> mapM extendType d])
+--               TypeLam{} -> specialize t
+--   newt <- lift genType
+--   val <- decDepth (randTree newt)
+--   return (defConvert val t)
 
 specialize :: CodaType -> Gen CodaType
 specialize t = case t of

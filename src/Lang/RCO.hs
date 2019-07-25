@@ -245,6 +245,7 @@ instance CodaLangEnv RCOPass RCORes where
         OptionVar vname -> do
             optval <- val >>= rcoValue
             withOptVar vname optval body
+    -- deprecate
     convert typeTag val t = do
         optEnv <- use (optvar . to M.toList)
         let catCmd v = RCOCmd optEnv (ClCat v)
@@ -252,9 +253,7 @@ instance CodaLangEnv RCOPass RCORes where
             makeVar c = Var <$> (bindName c)
             mapWithKeyM f m = sequence (M.mapWithKey f m)
             castFromTo :: RCOVal -> CodaType -> CodaType -> RCOPass RCOVal
-            castFromTo fval fty tty 
-                | fty `isSubtypeOf` tty = return fval
-                | otherwise = case fty of
+            castFromTo fval fty tty = case fty of
                     TypeBundle -> case tty of
                         TypeString -> catCmd <$> rcoValue fval
                         TypeRecord dt ->
@@ -281,6 +280,7 @@ instance CodaLangEnv RCOPass RCORes where
                             RCOVar <$> bindName (RCOBundle fcoda)
                         TypeString -> return fval
                         TypeRecord{} -> error "RCO: convert string to record"
+                    TypeLam{} -> return fval
             castBundle bd ty = case ty of
                 TypeBundle -> return bd
                 _ -> castFromTo bd TypeBundle ty
