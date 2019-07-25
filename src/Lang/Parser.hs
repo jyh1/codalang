@@ -171,13 +171,13 @@ parenExpr = highlight Special (token (parens inside)) <?> "paren expression"
 commandExpr :: (TokenParsing m) => m ParseRes
 commandExpr = token (highlight StringLiteral (PRun <$> runCommand))
     where
-        plainLetter = satisfy (\c -> (c /= '\'') && (c /= '$') && (c /= '\\') && (c > '\026'))
+        plainLetter = satisfy (\c -> (c /= '@') && (c /= '$') && (c /= '\\') && (c > '\026'))
         escapeChar = highlight EscapeCode $ char '\\' *> esc where
-            esc = char '$' <|> char '\\' <|> char '\''
+            esc = char '$' <|> char '\\' <|> char '@'
         plainText = (Plain . T.pack) <$> some (plainLetter <|> escapeChar)        
-        embedParens = nesting . between (symbolic '(') (char ')')
+        embedParens = nesting . between (symbolic '{') (char '}')
         embedExpr = CMDExpr <$> (char '$' *> (varExpr <|> embedParens (token codaExpr)))
-        runCommand = between (char '\'') (char '\'' <?> "end of command") (some (plainText <|> embedExpr))
+        runCommand = between (char '@') (char '@' <?> "end of command") (some (plainText <|> embedExpr))
             <?> "command"
 
 stringExpr :: (TokenParsing m) => m ParseRes

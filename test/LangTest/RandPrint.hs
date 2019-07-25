@@ -139,20 +139,20 @@ escCmdStr :: Char -> String
 escCmdStr c = case c of
     '\\' -> "\\\\"
     '$' -> "\\$"
-    '\'' -> "\\'"
+    '@' -> "\\@"
     _ -> [c]
 
 rendCmdEle :: (CMDEle CodaVal Text) -> RendCoda
 rendCmdEle (CMDExpr a) = case a of
     Var v -> RLis [Symbol "$", Symbol v]
-    _ -> RLis [Symbol "$(", (rendCoda a), Symbol ")"]
+    _ -> RLis [Symbol "${", (rendCoda a), Symbol "}"]
 rendCmdEle (Plain a) = Symbol (T.pack (concatMap escCmdStr (T.unpack a)))
 
 rendCoda :: CodaVal -> RendCoda
 rendCoda cv = case cv of
     Lit u -> entity (RLit u)
     Var v -> entSym v
-    Cl _ (Run rs) -> entity (RLis ([Symbol "'"] ++ rendLis ++ [Symbol "'"]))
+    Cl _ (Run rs) -> entity (RLis ([Symbol "@"] ++ rendLis ++ [Symbol "@"]))
         where
             rendLis = rendCmdEle <$> rs
     Cl _ (ClCat val) -> rendCoda (defConvert val TypeString)
