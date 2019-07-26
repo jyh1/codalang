@@ -144,7 +144,7 @@ data CodaResult = ResStr Text | ResBundle UUID
 
 type ClOption = [(Text, Text)]
 
-data Execute = ExecRun [(Text, Text)] [Text] ClOption
+data Execute = ExecRun [(Text, Text)] String ClOption
     | ExecCat Text ClOption
     | ExecMake [(Text, Text)] ClOption
     deriving (Show, Read, Eq)

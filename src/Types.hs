@@ -13,6 +13,8 @@ import Control.Monad.State
 import qualified RIO.Text.Partial as T
 import qualified RIO.ByteString as B
 import RIO.List.Partial
+import RIO.Partial (fromJust)
+import Data.Tuple (swap)
 import qualified RIO.ByteString.Lazy as BL
 import RIO.Char (showLitChar)
 import           RIO.Process
@@ -68,16 +70,15 @@ instance Exec (RIO App) Text where
     let ustr = tshow u
     appLog (Assign [EntVerbatim vn] [EntUUID ustr])
     return ustr
-  -- clRun vn depMap cmd = do
-  --   clcmd <- view appClCmd
-  --   execRes <- liftIO (clcmd execCmd)
-  --   resid <- parseUUID execRes
-  --   appLog (Assign [EntOptEnv vn, EntParen (EntUUID resid)] (escapeVerbatim <$> cmdTxt))
-  --   return resid
-  --  where
-  --   cmdTxt = fromEle <$> cmd
-  --   depTxt  = M.toList depMap
-  --   execCmd = ExecRun depTxt cmdTxt (consOptionList vn)
+  clRun vn depMap cmd = do
+    clcmd <- view appClCmd
+    execRes <- liftIO (clcmd execCmd)
+    resid <- parseUUID execRes
+    appLog (Assign [EntOptEnv vn, EntParen (EntUUID resid)] [EntVerbatim (T.pack cmdstr)])
+    return resid
+   where
+    (uniqdm, cmdstr) = fromCodaEles depMap cmd
+    execCmd = ExecRun (M.toList uniqdm) cmdstr (consOptionList vn)
   clCat vn val = do
     clcmd <- view appClCmd
     res <- liftIO (clcmd execCmd)
@@ -96,6 +97,27 @@ instance Exec (RIO App) Text where
   fromBundleName bn = return bn
   execDir d p = return (buildPath [d, p])
   execRec mp = return (tshow mp)
+
+-- remove duplicates in dependencies
+fromCodaEles :: (TextMap Text) -> [CodaCMDEle Text] -> (TextMap Text, String)
+fromCodaEles dm es = (newDm, concatMap fromEle es)
+  where
+    swapMap m = M.fromList (swap <$> M.toList m)
+    unsafeLookup m d = fromJust (M.lookup d m)
+    bundleToName = swapMap dm
+    synonyms = unsafeLookup bundleToName <$> dm
+    newDm = swapMap bundleToName
+    fromEle e = case e of
+      BundleRef t -> T.unpack (unsafeLookup synonyms t)
+      TextValue t -> escapeCmd (T.unpack t)
+      TextPlain t -> T.unpack t
+
+escapeCmd :: String -> String
+escapeCmd xs = "'" ++ concatMap f xs ++ "'" where
+    f '\0' = ""
+    f '\'' = "'\"'\"'"
+    f x    = [x]
+
 
 type LoadState = [Module]
 loadStack :: Lens' LoadState [Module]
@@ -141,14 +163,6 @@ runParser s = evalStateT parse []
 
 consOptionList :: (ClInfo Text) -> ClOption
 consOptionList (ClInfo vname optList) = ("name", vname) : optList
-
--- fromDeps :: Deps Text -> Text
--- fromDeps (Deps r ps) = buildPath (r : ps)
-
-fromEle :: CMDEle Text Text -> Text
-fromEle e = case e of
-    Plain t        -> t
-    CMDExpr r -> r
       
 parseUUID :: ByteString -> RIO App Text
 parseUUID res = do

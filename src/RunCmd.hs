@@ -14,10 +14,10 @@ import Lang.Lang
 
 cmdExec :: Int64 -> Execute -> IO ByteString
 cmdExec bufferSize exec = case exec of
-    ExecRun env cmd opts ->
+    ExecRun env cmdstr opts ->
         procStdout process
         where
-            (subcmd, cmdstr) = buildRunCmd cmd
+            subcmd = "run"
             envstr = buildEnv env
             optArgs = makeOptArgs runOptions opts
             process = P.proc "cl" (concat [[subcmd], optArgs, envstr, [cmdstr]])
@@ -37,8 +37,6 @@ cmdExec bufferSize exec = case exec of
             return (toStrictBytes res)
         makeProc = P.proc "cl"
 
-buildRunCmd :: [Text] -> (String, String)
-buildRunCmd es = ("run", T.unpack (T.intercalate " " es))
 
 buildEnv :: Env -> [String]
 buildEnv es = envStr <$> es
