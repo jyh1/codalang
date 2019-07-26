@@ -117,10 +117,13 @@ varChar = alphaNum <|> oneOf "_.-"
 
 varName :: (TokenParsing m) => m Text
 varName = highlight Identifier (T.pack <$> varname <?> "variable_name")
-    where varname = token (liftA2 (:) letter (many varChar))
+    where varname = liftA2 (:) letter (many varChar)
 
 varExpr :: (TokenParsing m) => m ParseRes
 varExpr = PVar <$> varName <?> "variable"
+
+tokenVarExpr :: (TokenParsing m) => m ParseRes
+tokenVarExpr = token varExpr
 
 makeKeyword :: (TokenParsing m) => String -> m String
 makeKeyword t = try
@@ -141,7 +144,7 @@ letExpr = highlight Constructor (token (expr <?> "let_exprssions"))
         where 
             stmt = token (liftA2 (,) assignable (symbolic '=' *> codaExpr))
             globalVar :: (TokenParsing m) => m PAssign
-            globalVar = PLetOpt <$> (text "--" *> varName)
+            globalVar = PLetOpt <$> (text "--" *> (token varName))
             funVar :: (TokenParsing m) => m PAssign
             funVar = liftA2 consAssign (token varName) (optional $ typeDictExpr brackets)
                 where consAssign v = maybe (PLetVar v) (PLetFun v)
@@ -202,7 +205,7 @@ suffixExpr = highlight LiterateSyntax (token suffixParse) <?> "codalang expressi
 
 normalExpr :: (TokenParsing m) => m ParseRes
 normalExpr =
-    (bundleLit <|> stringExpr <|> letExpr <|> varExpr <|> parenExpr <|> pdictExpr <|> loadExpr <|> commandExpr)
+    (bundleLit <|> stringExpr <|> letExpr <|> tokenVarExpr <|> parenExpr <|> pdictExpr <|> loadExpr <|> commandExpr)
         <?> "regular codalang expression"
 
 
