@@ -68,16 +68,16 @@ instance Exec (RIO App) Text where
     let ustr = tshow u
     appLog (Assign [EntVerbatim vn] [EntUUID ustr])
     return ustr
-  clRun vn depMap cmd = do
-    clcmd <- view appClCmd
-    execRes <- liftIO (clcmd execCmd)
-    resid <- parseUUID execRes
-    appLog (Assign [EntOptEnv vn, EntParen (EntUUID resid)] (escapeVerbatim <$> cmdTxt))
-    return resid
-   where
-    cmdTxt = fromEle <$> cmd
-    depTxt  = M.toList depMap
-    execCmd = ExecRun depTxt cmdTxt (consOptionList vn)
+  -- clRun vn depMap cmd = do
+  --   clcmd <- view appClCmd
+  --   execRes <- liftIO (clcmd execCmd)
+  --   resid <- parseUUID execRes
+  --   appLog (Assign [EntOptEnv vn, EntParen (EntUUID resid)] (escapeVerbatim <$> cmdTxt))
+  --   return resid
+  --  where
+  --   cmdTxt = fromEle <$> cmd
+  --   depTxt  = M.toList depMap
+  --   execCmd = ExecRun depTxt cmdTxt (consOptionList vn)
   clCat vn val = do
     clcmd <- view appClCmd
     res <- liftIO (clcmd execCmd)

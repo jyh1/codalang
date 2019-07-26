@@ -176,13 +176,14 @@ testInterpret cv = (_cmdlog env, res)
         app = foldCoda cv
         (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
 
-parseEle :: (TextMap CodaTestRes) -> CMDEle Text CodaTestRes -> CodaTestRes
+parseEle :: (TextMap CodaTestRes) -> CodaCMDEle CodaTestRes -> CodaTestRes
 parseEle deps ele
     -- | traceShow eleDep False = undefined 
     -- | length paths == 1 = StrRes ele
     | otherwise = case ele of
-        Plain t -> t
-        CMDExpr eleVar -> 
+        TextValue t -> t
+        TextPlain t -> StrRes t
+        BundleRef eleVar -> 
             let eleDep = view (at eleVar . to (fromMaybe undefined)) deps in 
                 eleDep
 
@@ -249,10 +250,11 @@ evalBlk (JBlock v opt cmd) = do
         JLit v -> return (BunRes v)
     envL . at v ?= res
 
-fromCMDJEle :: CMDEle Text JRes -> InterApp (CMDEle Text CodaTestRes)
+fromCMDJEle :: CodaCMDEle JRes -> InterApp (CodaCMDEle CodaTestRes)
 fromCMDJEle e = case e of
-    Plain t -> Plain <$> evalStrJRes t
-    CMDExpr b -> return (CMDExpr b)
+    TextValue t -> TextValue <$> evalStrJRes t
+    BundleRef b -> return (BundleRef b)
+    TextPlain t -> return (TextPlain t)
     
 
 evalStrJRes :: JRes -> InterApp CodaTestRes

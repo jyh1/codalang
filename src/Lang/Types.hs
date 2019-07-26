@@ -190,8 +190,35 @@ instance (FromJSON a, FromJSON b) => FromJSON (CMDEle a b) where
             _ -> fail ("Unkonw type in CMDEle: " ++ T.unpack ty)
     parseJSON invalid = fail ("Error parsing CMDEle: " ++ show invalid)
 
+data CodaCMDEle a = BundleRef Text | TextValue a | TextPlain Text
+    deriving (Show, Read, Eq, Ord)
+
+makeCodaCmdEleKV :: (KeyValue kv, ToJSON a) => CodaCMDEle a -> [kv]
+makeCodaCmdEleKV x = case x of
+    TextPlain b -> [tagContent b, tagType "plain"]
+    BundleRef r -> [tagContent r, tagType "bundle"]
+    TextValue a -> [tagContent a, tagType "quote"]
+instance (ToJSON a) => ToJSON (CodaCMDEle a) where
+    toJSON e = object (makeCodaCmdEleKV e)
+    toEncoding e = doEncode (makeCodaCmdEleKV e)
+instance (FromJSON a) => FromJSON (CodaCMDEle a) where
+    parseJSON o@(Object v) = do
+        ty :: Text <- v .: "type"
+        cont :: Value <- v .: "content"
+        case ty of
+            "plain" -> TextPlain <$> parseJSON cont
+            "bundle" -> BundleRef <$> parseJSON cont
+            "quote" -> TextValue <$> parseJSON cont
+            _ -> fail ("Unkonw type in CMDEle: " ++ T.unpack ty)
+    parseJSON invalid = fail ("Error parsing CodaCMDEle: " ++ show invalid)
+
+fromCodaCMDEle :: (Text -> c) -> (a -> c) -> CodaCMDEle a -> c
+fromCodaCMDEle bundleref verbatim e = case e of
+    BundleRef t -> bundleref t
+    TextValue v -> verbatim v
+
 class (Monad m) => Exec m a where
-    clRun :: (ClInfo a) -> TextMap a -> [CMDEle Text a] -> m a
+    clRun :: (ClInfo a) -> TextMap a -> [CodaCMDEle a] -> m a
     clCat :: (ClInfo a) -> a -> m a
     clLit :: Text -> UUID -> m a
     clMake :: (ClInfo a) -> [(Text, a)] -> m a

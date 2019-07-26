@@ -23,7 +23,7 @@ import Data.Aeson
 type JCmdOpt = [(Text, JRes)]
 data JBlock a = JBlock !Text !JCmdOpt !(JCmd a)
     deriving (Show, Read, Eq)
-data JCmd a = JCat a | JMake [(Text, a)] | JRun [(Text, a)] [CMDEle Text a] | JLit Text
+data JCmd a = JCat a | JMake [(Text, a)] | JRun [(Text, a)] [CodaCMDEle a] | JLit Text
     deriving (Show, Read, Eq)
 data JRes = JVariable Text | JVerbatim Text | JDir JRes [Text] | JRec (TextMap JRes)
     deriving (Show, Read, Eq, Ord)

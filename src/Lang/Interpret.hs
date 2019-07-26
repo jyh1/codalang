@@ -52,7 +52,7 @@ prepLetRhs vn cv = case cv of
         opts <- (traverse . _2) runCodaRes optEnv
         let clinfo = ClInfo vn opts
         case clcmd of
-            -- Run cmd -> processRun clinfo cmd
+            Run cmd -> processRun clinfo cmd
             ClCat val -> do
                 valDep <- runCodaRes val
                 lift (RuntimeString <$> clCat clinfo valDep)
@@ -69,36 +69,34 @@ prepLetRhs vn cv = case cv of
     Lit u -> lift (RuntimeBundle <$> clLit vn u)
     _     -> error "Impossible happened: not RCO expr in let assignment"
 
-processRun :: (Exec m a, Ord a) => ClInfo a -> [CodaVal] -> RunCoda m a
+processRun :: (Exec m a) => ClInfo a -> [CMDEle CodaVal Text] -> RunCoda m a
 processRun inf cmd = do
     prepCmd <- mapM prepCmdEle cmd
     let (depCmd, deps) = unzip prepCmd
-        (txtCmd, depRep) = rmDupDep depCmd (concat deps)
-    lift (RuntimeBundle <$> clRun inf depRep txtCmd)
+    lift (RuntimeBundle <$> clRun inf (M.fromList (concat deps)) depCmd)
     where
+        prepCmdEle :: (Exec m a) => CMDEle CodaVal Text -> StateT (RunEnv a) m (CodaCMDEle a, [(Text, a)])
         prepCmdEle ele = case ele of
-            Str{} -> do
-                res <- runCodaRes ele
-                return (Plain res, [])
-            Var v -> do
-                vres <- lookupVar v
-                return $ case vres of
-                    RuntimeString s -> (Plain s, [])
-                    RuntimeBundle b -> (CMDExpr b, [(b, v)])
-            -- Dir{} -> do
-            --     v <- runCodaRes (Var dirRoot)
-            --     return (CMDExpr v, [(v, dirRoot)])
-            --     where (dirRoot, path) = getPath [] ele
+            Plain t -> return (TextPlain t, [])
+            CMDExpr e -> case e of
+                Str t -> do
+                    strRes <- lift (strLit t)
+                    return (TextValue strRes, [])
+                Var v -> do
+                    vres <- lookupVar v
+                    return $ case vres of
+                        RuntimeString s -> (TextValue s, [])
+                        RuntimeBundle b -> (BundleRef v, [(v, b)])
             _ -> error "Impossible happened: arguments in run"
-        rmDupDep :: (Ord c, Ord a) => [CMDEle a b] -> [(a, c)] -> ([CMDEle c b], Map c a)
-        rmDupDep txtCmd deps = (depToVar <$> txtCmd, varVal)
-            where
-                valVar = M.fromList deps
-                depToVar ele = case ele of
-                    Plain s -> Plain s
-                    CMDExpr dep -> CMDExpr uniqVar
-                        where uniqVar = maybe undefined id (M.lookup dep valVar)
-                varVal = M.fromList (swap <$> M.toList valVar)
+        -- rmDupDep :: (Ord c, Ord a) => [CMDEle a b] -> [(a, c)] -> ([CMDEle c b], Map c a)
+        -- rmDupDep txtCmd deps = (depToVar <$> txtCmd, varVal)
+        --     where
+        --         valVar = M.fromList deps
+        --         depToVar ele = case ele of
+        --             Plain s -> Plain s
+        --             CMDExpr dep -> CMDExpr uniqVar
+        --                 where uniqVar = maybe undefined id (M.lookup dep valVar)
+        --         varVal = M.fromList (swap <$> M.toList valVar)
 
     
 getPath :: [Text] -> CodaVal -> (Text, [Text])
