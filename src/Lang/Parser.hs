@@ -9,6 +9,7 @@ module Lang.Parser
     , loadString
     , codaParser
     , byteToUUID
+    , loadByteString
     )
 where
 
@@ -284,6 +285,9 @@ parseModule mdl = do
 
 loadString :: (LoadModule m) => String -> m CodaVal
 loadString inp = fromResult (parseString codaParser mempty inp)
+
+loadByteString :: (LoadModule m) => ByteString -> m CodaVal
+loadByteString inp = fromResult (parseByteString codaParser mempty inp)
 
 fromResult :: (LoadModule m) => Result ParseRes -> m CodaVal
 fromResult res = case res of
