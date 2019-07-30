@@ -46,7 +46,7 @@ instance HasLogFunc App where
 instance HasProcessContext App where
   processContextL = appProcessContext
 
-data LogEnt = EntVerbatim Text | EntUUID Text | EntParen LogEnt | EntOptEnv (ClInfo Text)
+data LogEnt = EntVerbatim Text | EntUUID Text | EntParen LogEnt | EntOptEnv Text
   deriving (Show, Read, Eq)
 escapeVerbatim :: Text -> LogEnt
 escapeVerbatim t = EntVerbatim (T.pack (T.foldr showLitChar "" t))
@@ -60,7 +60,7 @@ instance Display LogInfo where
       render (EntVerbatim t) = t
       render (EntUUID u) = T.take 7 u
       render (EntParen e) = T.concat ["(", render e, ")"]
-      render (EntOptEnv e) = render (EntVerbatim (_codaName e))
+      render (EntOptEnv t) = render (EntVerbatim t)
 
 appLog :: LogInfo -> RIO App ()
 appLog l = logInfo (display l)
@@ -74,24 +74,26 @@ instance Exec (RIO App) Text where
     clcmd <- view appClCmd
     execRes <- liftIO (clcmd execCmd)
     resid <- parseUUID execRes
-    appLog (Assign [EntOptEnv vn, EntParen (EntUUID resid)] [EntVerbatim (T.pack cmdstr)])
+    appLog (Assign [EntOptEnv undefined, EntParen (EntUUID resid)] [EntVerbatim (T.pack cmdstr)])
     return resid
    where
     (uniqdm, cmdstr) = fromCodaEles depMap cmd
-    execCmd = ExecRun (M.toList uniqdm) cmdstr (consOptionList vn)
+    -- execCmd = ExecRun (M.toList uniqdm) cmdstr (consOptionList vn)
+    execCmd = ExecRun (M.toList uniqdm) cmdstr undefined
   clCat vn val = do
     clcmd <- view appClCmd
     res <- liftIO (clcmd execCmd)
     let resText = decodeUtf8Lenient res
-    appLog (Assign [EntOptEnv vn] [EntVerbatim (tshow resText)])
+    appLog (Assign [EntOptEnv undefined] [EntVerbatim (tshow resText)])
     return resText
     where
-      execCmd = ExecCat val (consOptionList vn)
+      -- execCmd = ExecCat val (consOptionList vn)
+      execCmd = ExecCat val undefined
   clMake vn ks = do
     clcmd <- view appClCmd
-    let makeCmd = ExecMake ks (consOptionList vn)
+    let makeCmd = ExecMake ks ""
     execRes <- liftIO (clcmd makeCmd) >>= parseUUID
-    appLog (Assign [EntOptEnv vn] [EntUUID execRes])
+    appLog (Assign [EntOptEnv undefined] [EntUUID execRes])
     return execRes
   strLit s = return s
   fromBundleName bn = return bn
@@ -141,7 +143,7 @@ instance LoadModule (StateT LoadState (RIO App)) where
           SysPath p -> B.readFile (T.unpack p)
           CodaBundle b -> do
             clcmd <- view appClCmd
-            liftIO (clcmd (ExecCat b []))
+            liftIO (clcmd (ExecCat b ""))
           URL l -> do
             r <- liftIO $ Wreq.get (T.unpack l)
             buffsize <- view (appOptions . to optionsBufferSize)
@@ -161,8 +163,8 @@ runParser s = evalStateT parse []
       parse :: StateT [Module] (RIO App) CodaVal
       parse = loadString s
 
-consOptionList :: (ClInfo Text) -> ClOption
-consOptionList (ClInfo vname optList) = ("name", vname) : optList
+-- consOptionList :: (ClInfo Text) -> ClOption
+-- consOptionList (ClInfo vname optList) = ("name", vname) : optList
       
 parseUUID :: ByteString -> RIO App Text
 parseUUID res = do

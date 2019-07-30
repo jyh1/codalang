@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- interpreter for codaval, after RCO
 module Lang.Interpret(evalCoda) where
@@ -49,8 +50,9 @@ runCoda cv = case cv of
 prepLetRhs :: (Exec m a, Ord a) => Text -> CodaVal -> RunCoda m a
 prepLetRhs vn cv = case cv of
     Cl optEnv clcmd -> do
-        opts <- (traverse . _2) runCodaRes optEnv
-        let clinfo = ClInfo vn opts
+        -- opts <- (traverse . _2) runCodaRes optEnv
+        -- let clinfo = ClInfo vn opts
+        let clinfo = undefined
         case clcmd of
             Run cmd -> processRun clinfo cmd
             ClCat val -> do
@@ -70,33 +72,24 @@ prepLetRhs vn cv = case cv of
     _     -> error "Impossible happened: not RCO expr in let assignment"
 
 processRun :: (Exec m a) => ClInfo a -> [CMDEle CodaVal Text] -> RunCoda m a
-processRun inf cmd = do
-    prepCmd <- mapM prepCmdEle cmd
-    let (depCmd, deps) = unzip prepCmd
-    lift (RuntimeBundle <$> clRun inf (M.fromList (concat deps)) depCmd)
-    where
-        prepCmdEle :: (Exec m a) => CMDEle CodaVal Text -> StateT (RunEnv a) m (CodaCMDEle a, [(Text, a)])
-        prepCmdEle ele = case ele of
-            Plain t -> return (TextPlain t, [])
-            CMDExpr e -> case e of
-                Str t -> do
-                    strRes <- lift (strLit t)
-                    return (TextValue strRes, [])
-                Var v -> do
-                    vres <- lookupVar v
-                    return $ case vres of
-                        RuntimeString s -> (TextValue s, [])
-                        RuntimeBundle b -> (BundleRef v, [(v, b)])
-            _ -> error "Impossible happened: arguments in run"
-        -- rmDupDep :: (Ord c, Ord a) => [CMDEle a b] -> [(a, c)] -> ([CMDEle c b], Map c a)
-        -- rmDupDep txtCmd deps = (depToVar <$> txtCmd, varVal)
-        --     where
-        --         valVar = M.fromList deps
-        --         depToVar ele = case ele of
-        --             Plain s -> Plain s
-        --             CMDExpr dep -> CMDExpr uniqVar
-        --                 where uniqVar = maybe undefined id (M.lookup dep valVar)
-        --         varVal = M.fromList (swap <$> M.toList valVar)
+processRun = undefined
+-- processRun inf cmd = do
+--     prepCmd <- mapM prepCmdEle cmd
+--     let (depCmd, deps) = unzip prepCmd
+--     lift (RuntimeBundle <$> clRun inf (M.fromList (concat deps)) depCmd)
+--     where
+--         prepCmdEle :: (Exec m a) => CMDEle CodaVal Text -> StateT (RunEnv a) m (CodaCMDEle a, [(Text, a)])
+--         prepCmdEle ele = case ele of
+--             Plain t -> return (TextPlain t, [])
+--             CMDExpr e -> case e of
+--                 Str t -> do
+--                     strRes <- lift (strLit t)
+--                     return (TextValue strRes, [])
+--                 Var v -> do
+--                     vres <- lookupVar v
+--                     return $ case vres of
+--                         RuntimeString s -> (TextValue s, [])
+--                         RuntimeBundle b -> (BundleRef v, [(v, b)])
 
     
 getPath :: [Text] -> CodaVal -> (Text, [Text])

@@ -20,8 +20,8 @@ import qualified RIO.HashMap as HM
 import Data.Aeson
 
 
-type JCmdOpt = [(Text, JRes)]
-data JBlock a = JBlock !Text !JCmdOpt !(JCmd a)
+type JCmdOpt a = [CodaCMDEle a]
+data JBlock a = JBlock !Text !(JCmdOpt a) !(JCmd a)
     deriving (Show, Read, Eq)
 data JCmd a = JCat a | JMake [(Text, a)] | JRun [(Text, a)] [CodaCMDEle a] | JLit Text
     deriving (Show, Read, Eq)
@@ -107,7 +107,7 @@ instance FromJSON JLang where
 
 instance Exec JCompileEnv JRes where
     clLit vn u = do
-        let blk = JBlock vn [] (JLit (tshow u))
+        let blk = JBlock vn undefined (JLit (tshow u))
         writeBlk blk
         return (JVariable vn)
     clCat clinfo res = makeJBlk clinfo (JCat res)
@@ -122,8 +122,8 @@ instance Exec JCompileEnv JRes where
 
 
 makeJBlk :: ClInfo JRes -> JCmd JRes -> JCompileEnv JRes
-makeJBlk (ClInfo vname optList) cmd = do
-    let blk = JBlock vname optList cmd
+makeJBlk (ClInfo vname optenv) cmd = do
+    let blk = JBlock vname undefined cmd
     writeBlk blk
     return (JVariable vname)
 

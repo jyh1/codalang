@@ -23,12 +23,12 @@ import Lang.Interpret
 import Lang.JLang
 
 data CodaTestRes = BunRes Text 
-    | RunRes [(Text, CodaTestRes)] [CodaTestRes] 
+    | RunRes [CodaTestRes] [CodaTestRes] 
     | DirRes CodaTestRes [Text] 
     | StrRes Text 
     | DictRes (Map Text CodaTestRes)
-    | MakeRes [(Text, CodaTestRes)] [(Text, CodaTestRes)]
-    | ResLam TypeDict (TextMap CodaTestRes) (TextMap CodaTestRes) CodaVal
+    | MakeRes [CodaTestRes] [(Text, CodaTestRes)]
+    | ResLam TypeDict (TextMap CodaTestRes) CodaVal
     deriving (Show, Read, Eq, Ord)
 
 data CmdLog a = LogRun [a] | LogCat a | LogMake [(Text, a)]
@@ -38,9 +38,8 @@ type OptionEnv a = TextMap a
 
 data CodaInterEnv a = CodaInterEnv {
       _envmap :: VarMap a
-    , _cmdlog :: [([(Text, a)], CmdLog a)]
+    , _cmdlog :: [([CodaTestRes], CmdLog a)]
     , _counter :: Int
-    , _optionvars :: OptionEnv a
     }
     deriving (Show, Read, Eq)
 makeLenses ''CodaInterEnv
@@ -67,55 +66,53 @@ instance CodaLangEnv InterApp CodaTestRes where
             errmsg = error ("Undefined var in test interpreter: " ++ T.unpack v)
     cl optVals clcmd = do
         cmd <- sequenceA clcmd
-        let execcmd = case cmd of
+        optEnvs <- (traverse . cmdExpr) id optVals
+        let optEles = evalCmdEle <$> optEnvs
+            execcmd = case cmd of
                 Run cmd' -> do
                     let cmdEles = evalCmdEle <$> cmd'
-                    oe <- makeLog Nothing (LogRun cmdEles)
+                    oe <- makeLog optEles (LogRun cmdEles)
                     return (RunRes oe cmdEles)
-                ClCat val -> runCat Nothing val
-                ClMake val -> runMake Nothing val
-        if null optVals then execcmd else 
-            do
-                optionvars .= M.fromList optVals
-                res <- execcmd
-                optionvars .= M.empty
-                return res
+                ClCat val -> runCat optEles val
+                ClMake val -> runMake optEles val
+        res <- execcmd
+        return res
     dir val sub = return $ makeDir val sub
     clet af val body = do
         valres <- val
         case af of
             Variable varn -> withVar varn valres body
-            OptionVar varn -> do
-                origin <- use optionvars
-                optionvars %= (M.insert varn valres)
-                res <- body
-                optionvars .= origin
-                return res
+            -- OptionVar varn -> do
+            --     origin <- use optionvars
+            --     optionvars %= (M.insert varn valres)
+            --     res <- body
+            --     optionvars .= origin
+            --     return res
         
-    convert tt val vt = makeConvert val vt
-        where
-            makeConvert :: CodaTestRes -> CodaType -> InterApp CodaTestRes
-            makeConvert val vt = case vt of
-                TypeString -> case val of
-                    StrRes{} -> return val
-                    _ -> runCat Nothing val
-                TypeBundle -> case val of
-                    StrRes s -> return (BunRes s)
-                    DictRes dict -> do
-                        resD <- mapM (`makeConvert` TypeBundle) dict
-                        runMake Nothing (M.toList resD)
-                    _ -> return val
-                TypeRecord d -> case val of
-                    DictRes vd -> DictRes <$> (sequence $
-                        M.intersectionWith (\v t -> makeConvert v t) vd d)
-                    _ -> DictRes <$> sequence (M.mapWithKey (\k t -> dir val k >>= (`makeConvert` t)) d)
-                    where
-                        hasTypeString :: CodaType -> Bool
-                        hasTypeString t = case t of
-                            TypeString -> True
-                            TypeBundle -> False
-                            TypeRecord d -> anyOf traverse hasTypeString d
-                rest -> return val
+    -- convert tt val vt = makeConvert val vt
+    --     where
+    --         makeConvert :: CodaTestRes -> CodaType -> InterApp CodaTestRes
+    --         makeConvert val vt = case vt of
+    --             TypeString -> case val of
+    --                 StrRes{} -> return val
+    --                 _ -> runCat Nothing val
+    --             TypeBundle -> case val of
+    --                 StrRes s -> return (BunRes s)
+    --                 DictRes dict -> do
+    --                     resD <- mapM (`makeConvert` TypeBundle) dict
+    --                     runMake Nothing (M.toList resD)
+    --                 _ -> return val
+    --             TypeRecord d -> case val of
+    --                 DictRes vd -> DictRes <$> (sequence $
+    --                     M.intersectionWith (\v t -> makeConvert v t) vd d)
+    --                 _ -> DictRes <$> sequence (M.mapWithKey (\k t -> dir val k >>= (`makeConvert` t)) d)
+    --                 where
+    --                     hasTypeString :: CodaType -> Bool
+    --                     hasTypeString t = case t of
+    --                         TypeString -> True
+    --                         TypeBundle -> False
+    --                         TypeRecord d -> anyOf traverse hasTypeString d
+    --             rest -> return val
             -- softConvert :: CodaTestRes -> CodaType -> CodaTestRes
             -- softConvert res ty = case ty of
             --     TypeString -> res
@@ -127,16 +124,12 @@ instance CodaLangEnv InterApp CodaTestRes where
 
     lambda args body = do
         clo <- use envL
-        opt <- use optionvars
-        return (ResLam args clo opt body)
+        return (ResLam args clo body)
     apply f args = sandBox $ do
         case f of
-            ResLam argType clo opt body -> do
+            ResLam argType clo body -> do
                 envL .= M.union (M.intersection args argType) clo
-                oldopt <- use optionvars
-                optionvars .= opt
                 res <- foldCoda body
-                optionvars .= oldopt
                 return res
             _ -> error (show f)
 
@@ -155,26 +148,21 @@ runCatTxt opt val = do
 
 runCat opt v = StrRes <$> runCatTxt opt v
 
-makeLog opt cmd = case opt of
-    Nothing -> do
-        oe <- use (optionvars . to M.toList)
-        cmdlog %= ((oe, cmd) :)
-        return oe
-    Just oe -> cmdlog %= ((oe, cmd) :) >> return oe
+makeLog oe cmd = cmdlog %= ((oe, cmd) :) >> return oe
 
 -- runMake :: () -> [(Text, CodaTestRes)] -> InterApp CodaTestRes
 runMake opt ds = do
     oe <- makeLog opt (LogMake ds)
     return (MakeRes oe ds)
 -- return logs of runned command and final result
-type TestInterpret = CodaVal -> ([([(Text, CodaTestRes)], CmdLog CodaTestRes)], CodaTestRes)
+type TestInterpret = CodaVal -> ([([CodaTestRes], CmdLog CodaTestRes)], CodaTestRes)
 
 testInterpret :: TestInterpret
 testInterpret cv = (_cmdlog env, res)
     where
         app :: InterApp CodaTestRes
         app = foldCoda cv
-        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
+        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0))
 
 parseEle :: (TextMap CodaTestRes) -> CodaCMDEle CodaTestRes -> CodaTestRes
 parseEle deps ele
@@ -189,17 +177,17 @@ parseEle deps ele
 
 -- use interpret interface (after RCO)
 instance Exec InterApp CodaTestRes where
-    clRun opts deps cmd = do
-        cmdlog %= ((_clOpt opts, LogRun resCmd) :)
-        -- c <- getCounter
-        return (RunRes (_clOpt opts) resCmd)
+    clRun (ClInfo vn opt) deps cmd = do
+        let optval = undefined
+        cmdlog %= ((optval, LogRun resCmd) :)
+        return (RunRes optval resCmd)
         where
             resCmd = parseEle deps <$> cmd
 
                             
     clLit _ u = return (BunRes (tshow u))
-    clCat opts v = StrRes <$> runCatTxt (Just (_clOpt opts)) v
-    clMake opts ks = runMake (Just (_clOpt opts)) ks
+    clCat (ClInfo _ optval) v = StrRes <$> runCatTxt undefined v
+    clMake (ClInfo _ optval) ks = runMake undefined ks
     strLit s = return (StrRes s)
     fromBundleName (StrRes s) = return (BunRes s)
     execDir d p = return (fromDirRes d [p])
@@ -217,7 +205,7 @@ testInterpretWIntrfc cv = (_cmdlog env, res)
     where
         app :: InterApp CodaTestRes
         app = evalCoda cv
-        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
+        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0))
 
 
 testInterpretWJRes :: CodaType -> TestInterpret
@@ -225,7 +213,7 @@ testInterpretWJRes t v = (_cmdlog env, res)
     where
         app :: InterApp CodaTestRes
         app = fromJRes t (compileJ v)
-        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0 mempty))
+        (res, env) = runIdentity (runStateT app (CodaInterEnv mempty [] 0))
 
 fromJRes :: CodaType -> (JRes, [JBlock JRes]) -> InterApp CodaTestRes
 fromJRes t (res, blks) = do
@@ -233,14 +221,15 @@ fromJRes t (res, blks) = do
     evalResJRes t res
 evalBlk :: JBlock JRes -> InterApp ()
 evalBlk (JBlock v opt cmd) = do
-    optVal <- (traverse . _2) evalStrJRes opt
+    -- optVal <- (traverse . _2) evalStrJRes opt
+    let optVal = undefined
     res <- case cmd of
         JCat r -> do
             tres <- evalBunJRes r
-            StrRes <$> runCatTxt (Just optVal) tres
+            StrRes <$> runCatTxt optVal tres
         JMake ts -> do
             tres <- (traverse . _2) evalBunJRes ts
-            runMake (Just optVal) tres
+            runMake optVal tres
         JRun deps cmds -> do
             cmdRes <- mapM fromCMDJEle cmds
             depRes <- mapM evalBunJRes (M.fromList deps)

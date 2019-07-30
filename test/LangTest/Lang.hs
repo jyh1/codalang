@@ -392,7 +392,7 @@ isRunCmdEle :: RCOCheck
 isRunCmdEle x = msum [isVar x, isStr x, showError "isValue" x]
 
 isCMD :: RCOCheck
-isCMD (Cl oe cmd ) = sequence_ [(traverse_ . _2) isValue oe, cmdTest]
+isCMD (Cl oe cmd ) = sequence_ [(traverse_ . cmdExpr) isValue oe, cmdTest]
   where 
     cmdTest = case cmd of
       -- Run as -> sequence_ (isRunCmdEle <$> as)

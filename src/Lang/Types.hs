@@ -71,11 +71,11 @@ printAssignForm af = case af of
     Variable v -> v
     OptionVar v -> "--" <> v
 
-type OptEnv = [(Text, CodaVal)]
+type OptEnv a = [CMDEle a Text]
 -- CodaLang AST
 data CodaVal = Lit UUID
     | Var VarName
-    | Cl OptEnv CodaCmd
+    | Cl (OptEnv CodaVal) CodaCmd
     | Str Text
     | Dir CodaVal Text
     | Let AssignForm CodaVal CodaVal
@@ -144,9 +144,9 @@ data CodaResult = ResStr Text | ResBundle UUID
 
 type ClOption = [(Text, Text)]
 
-data Execute = ExecRun [(Text, Text)] String ClOption
-    | ExecCat Text ClOption
-    | ExecMake [(Text, Text)] ClOption
+data Execute = ExecRun [(Text, Text)] String Text
+    | ExecCat Text Text
+    | ExecMake [(Text, Text)] Text
     deriving (Show, Read, Eq)
 
 buildPath :: [Text] -> Text
@@ -218,19 +218,18 @@ fromCodaCMDEle bundleref verbatim e = case e of
     TextValue v -> verbatim v
 
 class (Monad m) => Exec m a where
-    clRun :: (ClInfo a) -> TextMap a -> [CodaCMDEle a] -> m a
-    clCat :: (ClInfo a) -> a -> m a
+    clRun :: ClInfo a -> TextMap a -> [CodaCMDEle a] -> m a
+    clCat :: ClInfo a -> a -> m a
     clLit :: Text -> UUID -> m a
-    clMake :: (ClInfo a) -> [(Text, a)] -> m a
+    clMake :: ClInfo a -> [(Text, a)] -> m a
     strLit :: Text -> m a
     fromBundleName :: a -> m a
     execDir :: a -> Text -> m a
     execRec :: TextMap a -> m a
 
 
-data ClInfo a = ClInfo {_codaName :: Text, _clOpt :: [(Text, a)]}
-    deriving (Show, Read, Eq)
-makeLenses ''ClInfo
+data ClInfo a = ClInfo {clname :: Text, clopt :: OptEnv a}
+    deriving(Show, Read, Eq)
 
 
 data Module = URL Text | SysPath Text | CodaBundle Text

@@ -102,10 +102,7 @@ instance CodaLangEnv PPPass PPrint where
             errmsg =
                 error ("Undefined variable in PPrint: " ++ T.unpack vn)
     str s = ranno StrAnno (pretty (show s))
-    cl optEnv cmd
-        | not (null optEnv) = 
-            foldr ($) (cl [] cmd) [ clet (OptionVar optVar) (return optVal) | (optVar, optVal) <- optEnv]
-        | otherwise = do
+    cl optEnv cmd = do
             cmd' <- sequence cmd
             case cmd' of
                 Run cs -> do

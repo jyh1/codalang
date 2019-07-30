@@ -19,17 +19,17 @@ cmdExec bufferSize exec = case exec of
         where
             subcmd = "run"
             envstr = buildEnv env
-            optArgs = makeOptArgs runOptions opts
+            optArgs = [T.unpack opts]
             process = P.proc "cl" (concat [[subcmd], optArgs, envstr, [cmdstr]])
     ExecCat v opts -> do
         let vstr = T.unpack v
-            optArgs = makeOptArgs catOptions opts
+            optArgs = [T.unpack opts]
         P.runProcess_ (P.setStdout P.createPipe (makeProc ["wait", vstr]))
         (catres, _) <- P.readProcess_ (makeProc ["cat", vstr])
         return (toStrictBytes (BL.take bufferSize catres))
     ExecMake ks opts -> do
         let cmdstr = buildEnv ks
-            optArgs = makeOptArgs makeOptions opts
+            optArgs = [T.unpack opts]
         procStdout (makeProc (concat [["make"], optArgs, cmdstr]))
     where
         procStdout pro = do

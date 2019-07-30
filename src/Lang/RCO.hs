@@ -50,7 +50,7 @@ data Closure = Closure {clovarenv :: RCOValMap, clooptenv :: RCOValMap}
 data RCOVal = RCOLit UUID 
     | RCOBundle VarName
     | RCOVar VarName 
-    | RCOCmd [(Text, RCOVal)] CmdRCO
+    | RCOCmd (OptEnv RCOVal) CmdRCO
     | RCODir VarName Path 
     | RCOStr Text
     | RCORec RCOValMap
@@ -188,7 +188,7 @@ toRetVal (RCOVar varn) = do
     maybe (return (Var varn)) load val
 toRetVal (RCOCmd optEnv cmd) = do
     cmdVal <- mapM toRetVal cmd
-    codaEnv <- (traverse . _2) toRetVal optEnv
+    codaEnv <- (traverse . cmdExpr) toRetVal optEnv
     return (Cl codaEnv cmdVal)
 
 rcoValue :: RCOVal -> RCOPass RCOVal
@@ -233,10 +233,10 @@ instance CodaLangEnv RCOPass RCORes where
                 (  "The impossible happened: undefined variable in RCO: "
                 ++ T.unpack v
                 )
-    cl _ cmd@(Run{}) = do
-        optEnv <- use (optvar . to M.toList)
-        RCOCmd optEnv <$> rcocmd
-        where rcocmd = traverse (>>= rcoLet) cmd
+    cl opts cmd@(Run{}) = do
+        optEnv <- (traverse . cmdExpr) (>>= rcoLet) opts
+        rcocmd <- traverse (>>= rcoLet) cmd
+        return (RCOCmd optEnv rcocmd)
     dir val subdir = toSubDir val subdir
     clet af val body = case af of
         Variable vname -> do
@@ -246,45 +246,45 @@ instance CodaLangEnv RCOPass RCORes where
             optval <- val >>= rcoValue
             withOptVar vname optval body
     -- deprecate
-    convert typeTag val t = do
-        optEnv <- use (optvar . to M.toList)
-        let catCmd v = RCOCmd optEnv (ClCat v)
-            valType = fromMaybe (error "no type tag in RCO convert") typeTag
-            makeVar c = Var <$> (bindName c)
-            mapWithKeyM f m = sequence (M.mapWithKey f m)
-            castFromTo :: RCOVal -> CodaType -> CodaType -> RCOPass RCOVal
-            castFromTo fval fty tty = case fty of
-                    TypeBundle -> case tty of
-                        TypeString -> catCmd <$> rcoValue fval
-                        TypeRecord dt ->
-                            RCORec <$> 
-                                mapWithKeyM (\ k t -> (dir fval k) >>= ( `castBundle` t) >>= rcoValue) dt
-                        TypeBundle -> return fval
-                    TypeRecord fdict -> case tty of
-                        TypeBundle -> do
-                            let castKeyT k t = do
-                                    dirres <- dir fval k
-                                    castFromTo dirres t TypeBundle >>= rcoValue
-                            bdRec <- mapWithKeyM castKeyT fdict
-                            return (RCOCmd optEnv (ClMake (M.toList bdRec)))
-                        TypeRecord tdict -> do
-                            let convRecEle :: Text -> CodaType -> CodaType -> RCOPass RCOVal
-                                convRecEle k ft tt = do
-                                    dirres <- dir fval k
-                                    castFromTo dirres ft tt >>= rcoValue
-                            RCORec <$> sequence (M.intersectionWithKey convRecEle fdict tdict)
-                        TypeString -> error "RCO: convert record to string"           
-                    TypeString -> case tty of
-                        TypeBundle -> do
-                            fcoda <- rcoValue fval >>= bindName
-                            RCOVar <$> bindName (RCOBundle fcoda)
-                        TypeString -> return fval
-                        TypeRecord{} -> error "RCO: convert string to record"
-                    TypeLam{} -> return fval
-            castBundle bd ty = case ty of
-                TypeBundle -> return bd
-                _ -> castFromTo bd TypeBundle ty
-        castFromTo val valType t
+    -- convert typeTag val t = do
+    --     optEnv <- use (optvar . to M.toList)
+    --     let catCmd v = RCOCmd optEnv (ClCat v)
+    --         valType = fromMaybe (error "no type tag in RCO convert") typeTag
+    --         makeVar c = Var <$> (bindName c)
+    --         mapWithKeyM f m = sequence (M.mapWithKey f m)
+    --         castFromTo :: RCOVal -> CodaType -> CodaType -> RCOPass RCOVal
+    --         castFromTo fval fty tty = case fty of
+    --                 TypeBundle -> case tty of
+    --                     TypeString -> catCmd <$> rcoValue fval
+    --                     TypeRecord dt ->
+    --                         RCORec <$> 
+    --                             mapWithKeyM (\ k t -> (dir fval k) >>= ( `castBundle` t) >>= rcoValue) dt
+    --                     TypeBundle -> return fval
+    --                 TypeRecord fdict -> case tty of
+    --                     TypeBundle -> do
+    --                         let castKeyT k t = do
+    --                                 dirres <- dir fval k
+    --                                 castFromTo dirres t TypeBundle >>= rcoValue
+    --                         bdRec <- mapWithKeyM castKeyT fdict
+    --                         return (RCOCmd optEnv (ClMake (M.toList bdRec)))
+    --                     TypeRecord tdict -> do
+    --                         let convRecEle :: Text -> CodaType -> CodaType -> RCOPass RCOVal
+    --                             convRecEle k ft tt = do
+    --                                 dirres <- dir fval k
+    --                                 castFromTo dirres ft tt >>= rcoValue
+    --                         RCORec <$> sequence (M.intersectionWithKey convRecEle fdict tdict)
+    --                     TypeString -> error "RCO: convert record to string"           
+    --                 TypeString -> case tty of
+    --                     TypeBundle -> do
+    --                         fcoda <- rcoValue fval >>= bindName
+    --                         RCOVar <$> bindName (RCOBundle fcoda)
+    --                     TypeString -> return fval
+    --                     TypeRecord{} -> error "RCO: convert string to record"
+    --                 TypeLam{} -> return fval
+    --         castBundle bd ty = case ty of
+    --             TypeBundle -> return bd
+    --             _ -> castFromTo bd TypeBundle ty
+    --     castFromTo val valType t
 
     dict rs = do
         rsv <- sequence rs
