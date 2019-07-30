@@ -39,6 +39,7 @@ data ParseRes = PLit Text
     | PDict (Map Text ParseRes)
     | PApply ParseRes (TextMap ParseRes)
     | PLoad Module
+    | PLambda TypeDict ParseRes
         deriving (Show, Read, Eq, Ord) 
 
 
@@ -89,6 +90,7 @@ fromParseRes res = case res of
     PDict d -> Dict <$> (mapM fromParseRes d)
     PApply fun args -> liftM2 Apply (fromParseRes fun) (mapM fromParseRes args)
     PLoad src -> parseModule src
+    PLambda args body -> Lambda args <$> (fromParseRes body)
 
 optionalFollowed :: (a -> b -> a) -> a -> Maybe b -> a
 optionalFollowed f a m = case m of
@@ -206,9 +208,11 @@ suffixExpr = highlight LiterateSyntax (token suffixParse) <?> "codalang expressi
 
 normalExpr :: (TokenParsing m) => m ParseRes
 normalExpr =
-    (bundleLit <|> stringExpr <|> letExpr <|> tokenVarExpr <|> parenExpr <|> pdictExpr <|> loadExpr <|> commandExpr)
+    (bundleLit <|> stringExpr <|> letExpr <|> tokenVarExpr <|> parenExpr <|> pdictExpr <|> loadExpr <|> commandExpr <|> lambdaExpr)
         <?> "regular codalang expression"
 
+lambdaExpr :: (TokenParsing m) => m ParseRes
+lambdaExpr = liftA2 PLambda argTypeDict (token (symbol "=>") *> codaExpr)
 
 dictKey :: (TokenParsing m) => m Text
 dictKey = T.pack <$> (some fileNameChar) <?> "type dictionary key"
@@ -226,7 +230,10 @@ typeExpr = typeStr <|> typeBunDict <|> typeFun <?> "type expression"
         typeBun = TypeRecord <$> (typeDictExpr braces)
         typeBunAll = makeKeyword "bundle" $> TypeBundle
         typeBunDict = typeBunAll <|> typeBun 
-        typeFun = liftA2 TypeLam (token (typeDictExpr brackets)) (token (symbol "=>") *> typeExpr)
+        typeFun = liftA2 TypeLam argTypeDict (token (symbol "=>") *> typeExpr)
+
+argTypeDict :: (TokenParsing m) => m TypeDict
+argTypeDict = token (typeDictExpr brackets)
 
 typeDictExpr :: (TokenParsing m) => (forall a. m a -> m a) -> m TypeDict
 typeDictExpr bra = M.fromList <$> bra (parseDicEles (token dictKey) (token typeExpr))

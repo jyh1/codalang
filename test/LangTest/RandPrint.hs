@@ -81,7 +81,7 @@ doRend rc = case rc of
         where
             annotLis = [singleColon (spaceSymbol k) v | (k, v) <- M.toList dic]
             annotComma = intersperse (spaceSymbol ",") annotLis
-    RLam arg body -> doRend (RLis [entity arg, spaceSymbol "=>", entity body])
+    RLam arg body -> doRend (RLis [arg, spaceSymbol "=>", entity body])
     where
         nTimes :: Int -> (a -> a) -> (a -> a)
         nTimes 0 _ = id
@@ -96,6 +96,7 @@ doRend rc = case rc of
             _ -> RLis (over _last rmSpace as)
         rmSpace ras@RLet{} = TightParens1 ras
         rmSpace ras@ColonAnnot{} = TightParens1 ras
+        rmSpace ras@RLam{} = TightParens1 ras
         rmSpace rest = rest
         enloseParen ll lr cont = RLis [ll, cont, lr]
 

@@ -63,6 +63,8 @@ parseSpec = describe "CodaVal_parser" $ do
         parseSucc "let x = y in x" (clet "x" [("x", "y")])
         parseSucc "  let x=0x02 in x" (clet "x" [("x", (l "02"))])
         parseSucc "let x =  (aa/run.py); y=(aa/run.py) in x" (clet "x" [("x", aapy), ("y", aapy)])
+    it "labmda_expr" $ do
+        parseSucc "[x:bundle, y:bundle]=>{a:x, b:y}" (Lambda (fromList [("x",TypeBundle),("y",TypeBundle)]) (Dict (fromList [("a",Var "x"),("b",Var "y")])))
     it "nested_let_expr" $ do
         parseSucc "let x = let y = 0x1 in y in x" (clet "x" [("x", clet "y" [("y", 1)])])
         parseSucc "@${let x = 0x0002 in x/a/b}${let x=0x01; y= \" x\" in @$x$y@/x}@"

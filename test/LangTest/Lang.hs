@@ -96,7 +96,7 @@ randLeaf c = genLeaf c (constLeaf c)
         do
           newN <- randVar
           fun <- Lambda td <$> sandBox (envL %= M.union td >> randLeaf ret)
-          return (Let (Variable newN) fun (Var newN))
+          return fun
         ]
       
 
@@ -155,7 +155,7 @@ randLet t = do
   varName <- lift randAssign
   let bodyGen = case varName of
         Variable var -> do
-          (vt, val) <- halfDepth (oneofGenEnv [randCodaVal, randLam])
+          (vt, val) <- halfDepth randCodaVal
           body <- withVar var vt (randTree t)
           return (val, body)
         _ -> do
@@ -212,13 +212,14 @@ randValMap d =
 randValDict :: TypeDict -> GenEnv CodaVal
 randValDict dt = Dict <$> randValMap dt
 
-randLam :: GenEnv (CodaType, CodaVal)
-randLam = sandBox $ do
-  ad <- lift randTypeDic 
-  ret <- lift randType
+-- randLam :: TypeDict -> CodaType -> GenEnv (CodaType, CodaVal)
+randLam :: TypeDict -> CodaType -> GenEnv CodaVal
+randLam ad ret = sandBox $ do
+  -- ad <- lift randTypeDic
+  -- ret <- lift randType
   envL %= M.union ad
   body <- decDepth $ randTree ret
-  return (TypeLam ad ret, Lambda ad body)
+  return (Lambda ad body)
 
 randApp :: CodaType -> GenEnv CodaVal
 randApp t = do
@@ -237,7 +238,7 @@ randTree t = do
       TypeRecord d -> randRecord d
       TypeString -> randString
       TypeBundle -> randBundle
-      TypeLam dt ret -> randLambda dt ret
+      TypeLam dt ret -> randLam dt ret
   where
     -- non leaf bundle type
     randRecord :: TypeDict -> GenEnv CodaVal
@@ -264,7 +265,7 @@ randType =
       (3, pure TypeString)
     , (3, pure TypeBundle)
     , (2, TypeRecord <$> randTypeDic)
-    , (1, liftA2 TypeLam randTypeDic randType)
+    , (3, liftA2 TypeLam randTypeDic randType)
   ]
 randDicKey = frequency ((1, randVarName) : [(2, pure ("key" <> tshow i)) | i <- [1..3]])
 randDicEle = liftA2 (curry id) randDicKey randType
