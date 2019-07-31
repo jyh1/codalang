@@ -23,17 +23,17 @@ import           Text.Parser.Token
 import           Text.Parser.Char               ( char )
 import           Text.Parser.Token.Highlight
 import           Text.Trifecta
-import           Data.Char (isSpace)
+import           Data.Char (isSpace, isLetter, isDigit)
 import           Control.Lens (unto)
 
-data PAssign = PLetVar Text | PLetOpt Text | PLetFun Text TypeDict
+data PAssign = PLetVar Text | PLetFun Text TypeDict
     deriving (Show, Read, Eq, Ord)
 
 data ParseRes = PLit Text
     | PVar Text
     | PStr Text
     | PLet [(PAssign, ParseRes)] ParseRes
-    | PRun [CMDEle ParseRes Text]
+    | PRun {penv :: OptEnv ParseRes, pcmd :: OptEnv ParseRes}
     | PDir ParseRes Text
     | PConv ParseRes [CodaType]
     | PDict (Map Text ParseRes)
@@ -63,7 +63,6 @@ fromPLet :: (LoadModule m) => PAssign -> ParseRes -> m CodaVal -> m CodaVal
 fromPLet pa val body = do
     let var = case pa of
             PLetVar t -> Variable t
-            PLetOpt t -> OptionVar t
             PLetFun f _ -> Variable f
     valres <- fromParseRes val
     let letval = case pa of
@@ -80,7 +79,10 @@ fromParseRes res = case res of
     PLet as body -> foldr (uncurry fromPLet)
                           (fromParseRes body)
                           as
-    PRun ps   -> (makeCl . Run) <$> ((traverse . cmdExpr) fromParseRes ps)
+    PRun args ps   -> do
+        argres <- (traverse . cmdExpr) fromParseRes args
+        pres <- (traverse . cmdExpr) fromParseRes ps
+        return (Cl argres (Run pres))
     PDir home subs -> (`Dir` subs) <$> fromParseRes home
     PConv val ts -> case ts of
         [] -> fromParseRes val
@@ -116,7 +118,7 @@ bundleLit = highlight Constant uuidlit
         uuidlit = token ((PLit <$> bundleName) <?> "UUID or bundle name")
 
 varChar :: (TokenParsing m) => m Char
-varChar = alphaNum <|> oneOf "_.-"
+varChar = (satisfy (\c -> isDigit c || isLetter c)) <|> oneOf "_.-"
 
 varName :: (TokenParsing m) => m Text
 varName = highlight Identifier (T.pack <$> varname <?> "variable_name")
@@ -146,12 +148,12 @@ letExpr = highlight Constructor (token (expr <?> "let_exprssions"))
     letStmt = highlight Statement stmt <?> "let statement"
         where 
             stmt = token (liftA2 (,) assignable (symbolic '=' *> codaExpr))
-            globalVar :: (TokenParsing m) => m PAssign
-            globalVar = PLetOpt <$> (text "--" *> (token varName))
+            -- globalVar :: (TokenParsing m) => m PAssign
+            -- globalVar = PLetOpt <$> (text "--" *> (token varName))
             funVar :: (TokenParsing m) => m PAssign
             funVar = liftA2 consAssign (token varName) (optional $ typeDictExpr brackets)
                 where consAssign v = maybe (PLetVar v) (PLetFun v)
-            assignable = globalVar <|> funVar
+            assignable = funVar
 
 -- | used to build dir expression and paren expression
 followedByList
@@ -175,15 +177,25 @@ parenExpr = highlight Special (token (parens inside)) <?> "paren expression"
 
 -- run command
 commandExpr :: (TokenParsing m) => m ParseRes
-commandExpr = token (highlight StringLiteral (PRun <$> runCommand))
+commandExpr = token (highlight StringLiteral runCommand)
     where
-        plainLetter = satisfy (\c -> (c /= '@') && (c /= '$') && (c /= '\\') && (c > '\026'))
+        plainLetter = satisfy (\c -> (c /= '@') && (c /= '$') && (c /= '\\') && (c /= '#') && (c > '\026'))
         escapeChar = highlight EscapeCode $ char '\\' *> esc where
-            esc = char '$' <|> char '\\' <|> char '@'
+        esc = char '$' <|> char '\\' <|> char '@' <|> char '#'
         plainText = (Plain . T.pack) <$> some (plainLetter <|> escapeChar)        
         embedParens = nesting . between (symbolic '{') (char '}')
         embedExpr = CMDExpr <$> (char '$' *> (varExpr <|> embedParens (token codaExpr)))
-        runCommand = between (char '@') (char '@' <?> "end of command") (some (plainText <|> embedExpr))
+        
+        cmdEle = plainText <|> embedExpr
+        punSep = char '#'
+        
+        first = many cmdEle
+        second = (punSep *> some cmdEle) <|> pure []
+        makeRun f s = case s of
+            [] -> PRun [] f
+            _ -> PRun f s
+        cmdExpr = liftA2 makeRun first second
+        runCommand = between (char '@') (char '@' <?> "end of command") cmdExpr
             <?> "command"
 
 stringExpr :: (TokenParsing m) => m ParseRes

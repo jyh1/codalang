@@ -30,6 +30,7 @@ data RendCoda = Parens RendCoda
     | RType CodaType
     | RDic RendCoda RendCoda (Map Text RendCoda)
     | RLam RendCoda RendCoda
+    | RRun [RendCoda] [RendCoda]
     deriving (Show, Read, Eq, Ord)
 
 -- | symbol that could be surrounded with spaces
@@ -82,6 +83,15 @@ doRend rc = case rc of
             annotLis = [singleColon (spaceSymbol k) v | (k, v) <- M.toList dic]
             annotComma = intersperse (spaceSymbol ",") annotLis
     RLam arg body -> doRend (RLis [arg, spaceSymbol "=>", entity body])
+    -- Cl env (Run rs) -> entity (RLis ([Symbol "@"] ++ rendEnvLis ++ [Symbol "#"] ++ rendLis ++ [Symbol "@"]))
+    RRun env cmd -> case env of
+        [] -> do
+            c <- coin
+            doRend (bool (onlyCmd) (withPun) c)
+        _ -> doRend withPun
+        where
+            onlyCmd = RLis ([Symbol "@"] ++ cmd ++ [Symbol "@"])
+            withPun = RLis ([Symbol "@"] ++ env ++ [Symbol "#"] ++ cmd ++ [Symbol "@"])
     where
         nTimes :: Int -> (a -> a) -> (a -> a)
         nTimes 0 _ = id
@@ -141,6 +151,7 @@ escCmdStr c = case c of
     '\\' -> "\\\\"
     '$' -> "\\$"
     '@' -> "\\@"
+    '#' -> "\\#"
     _ -> [c]
 
 rendCmdEle :: (CMDEle CodaVal Text) -> RendCoda
@@ -153,9 +164,11 @@ rendCoda :: CodaVal -> RendCoda
 rendCoda cv = case cv of
     Lit u -> entity (RLit u)
     Var v -> entSym v
-    Cl _ (Run rs) -> entity (RLis ([Symbol "@"] ++ rendLis ++ [Symbol "@"]))
+    -- Cl env (Run rs) -> entity (RLis ([Symbol "@"] ++ rendEnvLis ++ [Symbol "#"] ++ rendLis ++ [Symbol "@"]))
+    Cl env (Run rs) -> entity (RRun rendEnvLis rendLis)
         where
             rendLis = rendCmdEle <$> rs
+            rendEnvLis = rendCmdEle <$> env
     Cl _ (ClCat val) -> rendCoda (defConvert val TypeString)
     Str s -> entity (RStr s)
     Dir b ps -> entity (RLis [rendB, dirSep, rendP])

@@ -33,7 +33,7 @@ type VarName = Text
 
 -- Codalab command
 
-data Cmd a = Run [CMDEle a Text] | ClCat a | ClMake [(Text, a)]
+data Cmd a = Run (OptEnv a) | ClCat a | ClMake [(Text, a)]
     deriving (Eq, Ord, Read, Show, Generic)
 instance Functor Cmd where
     fmap f cmd = case cmd of

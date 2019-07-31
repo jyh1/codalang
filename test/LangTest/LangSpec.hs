@@ -59,6 +59,10 @@ parseSpec = describe "CodaVal_parser" $ do
         parseSucc "@$xy1/a 'a b' @" (clrun [ce (v "xy1"), p "/a 'a b' "])
         parseSucc "@$xy1/a \\$(a b) @" (clrun [ce (v "xy1"), p "/a $(a b) "])
         parseSucc "@$xy1/a \\\\'a b\\\\' @" (clrun [ce (v "xy1"), p "/a \\'a b\\' "])
+    it "cmd_expr_env" $ do
+        parseSucc "@ a b # c d@" (Cl [p " a b "] (Run [p " c d"]))
+        parseSucc "@# a b c d@" (Cl [] (Run [p " a b c d"]))
+        parseSucc "@ b $a #a b c d@" (Cl [p " b ", ce (v "a"), p " "] (Run [p "a b c d"]))
     it "simple_let_expr" $ do
         parseSucc "let x = y in x" (clet "x" [("x", "y")])
         parseSucc "  let x=0x02 in x" (clet "x" [("x", (l "02"))])
@@ -69,16 +73,6 @@ parseSpec = describe "CodaVal_parser" $ do
         parseSucc "let x = let y = 0x1 in y in x" (clet "x" [("x", clet "y" [("y", 1)])])
         parseSucc "@${let x = 0x0002 in x/a/b}${let x=0x01; y= \" x\" in @$x$y@/x}@"
             (r [clet (d "x" ["a", "b"]) [("x", (l "0002"))], clet (d (r ["x", "y"]) ["x"]) [("x", (l "01")), ("y", s " x")]])
-    -- deprecated
-    -- it "type_annotation" $ do
-    --     let l2 = l "02"
-    --         l2xy = d l2 ["x", "y"]
-    --     parseSucc "0x02 as string" (cv l2 ts)
-    --     parseSucc "0x02 as {}" (cv l2 emptBd)
-    --     parseSucc "0x02 as bundle" (cv l2 abd)
-    --     parseSucc "0x02/x/y as string" (cv l2xy ts)
-    --     parseSucc "0x02/x/y as { a: string, b :{}}" (cv l2xy (bd [("a", ts), ("b", emptBd)]))
-    --     parseSucc "0x02/x/y as { a: string, b :bundle}" (cv l2xy (bd [("a", ts), ("b", abd)]))
     it "dictionary" $ do
         parseSucc "{xx:0x1}" (dict [("xx", l "1")])
         parseSucc "{x:0x1, y:0x02/a}" (dict [("x", l "1"), ("y", d (l "02") ["a"])])
@@ -88,7 +82,7 @@ parseSpec = describe "CodaVal_parser" $ do
 parserQuickCheck :: Spec
 parserQuickCheck = describe "parser_quick_check" $ 
     it "parse back from randomly printed string" $ property $
-        quickCheckWith stdArgs{ maxSuccess = 300 } (\(ParserTest cv cvStr) -> testParse cvStr `shouldBe` (Just cv))
+        quickCheckWith stdArgs{ maxSuccess = 300 } (\(ParserTest cv cvStr) -> testParse cvStr == (Just cv))
 
 pprintC = putStrLn . testPPrint
 randomPrint = generate arbitrary >>= (\(RandCoda _ cv) -> pprintC cv)

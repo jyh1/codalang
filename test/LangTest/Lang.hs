@@ -130,9 +130,12 @@ randDir t = do
       return (ty, newN)
 
 randCl :: GenEnv CodaVal
-randCl = makeCl <$> randCmd
+randCl = liftA2 Cl (randClEle 0 [TypeString]) (Run <$> randClEle 1 [TypeBundle, TypeString])
+
+randClEle :: Int -> [CodaType] -> GenEnv (OptEnv CodaVal)
+randClEle n ts = randCmd
   where
-    randCmd :: GenEnv CodaCmd
+    randCmd :: GenEnv (OptEnv CodaVal)
     randCmd = do
       let
         randCmdExpr = CMDExpr <$> (pickType >>= randTree)
@@ -143,11 +146,11 @@ randCl = makeCl <$> randCmd
         plainExpr = twoEle randCmdPlain randCmdExpr
         exprExpr = twoEle randCmdExpr randCmdExpr
         randCmdEles = oneofGenEnv [plainExpr, exprExpr]
-      cmdeles <- (`replicate` randCmdEles) <$> lift (choose (1, 3))
+      cmdeles <- (`replicate` randCmdEles) <$> lift (choose (n, 3))
       geneles <- zipWithM ($) reduceDepth cmdeles
-      return (Run (concat geneles))
+      return (concat geneles)
       where
-        pickType = lift (elements [TypeBundle, TypeString])
+        pickType = lift (elements ts)
         reduceDepth = decDepth : decDepth : repeat halfDepth
 
 randLet :: CodaType -> GenEnv CodaVal
@@ -168,7 +171,7 @@ randLet t = do
     randAssign :: Gen AssignForm
     randAssign = frequency [
         (5, Variable <$> genVar)
-      , (5, OptionVar <$> genVar)
+      -- , (5, OptionVar <$> genVar)
       ]
 
 -- disable generate convert node
