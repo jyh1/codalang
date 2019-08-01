@@ -178,12 +178,10 @@ parseEle deps ele
 -- use interpret interface (after RCO)
 instance Exec InterApp CodaTestRes where
     clRun (ClInfo vn opt) deps cmd = do
-        let optval = undefined
+        let optval = parseEle mempty <$> opt
+            resCmd = parseEle deps <$> cmd
         cmdlog %= ((optval, LogRun resCmd) :)
         return (RunRes optval resCmd)
-        where
-            resCmd = parseEle deps <$> cmd
-
                             
     clLit _ u = return (BunRes (tshow u))
     clCat (ClInfo _ optval) v = StrRes <$> runCatTxt undefined v

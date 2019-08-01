@@ -50,9 +50,8 @@ runCoda cv = case cv of
 prepLetRhs :: (Exec m a, Ord a) => Text -> CodaVal -> RunCoda m a
 prepLetRhs vn cv = case cv of
     Cl optEnv clcmd -> do
-        -- opts <- (traverse . _2) runCodaRes optEnv
-        -- let clinfo = ClInfo vn opts
-        let clinfo = undefined
+        opts <- mapM prepCmdEle optEnv
+        let clinfo = ClInfo vn (fst <$> opts)
         case clcmd of
             Run cmd -> processRun clinfo cmd
             ClCat val -> do
@@ -71,25 +70,24 @@ prepLetRhs vn cv = case cv of
     Lit u -> lift (RuntimeBundle <$> clLit vn u)
     _     -> error "Impossible happened: not RCO expr in let assignment"
 
+prepCmdEle :: (Exec m a) => CMDEle CodaVal Text -> StateT (RunEnv a) m (CodaCMDEle a, [(Text, a)])
+prepCmdEle ele = case ele of
+    Plain t -> return (TextPlain t, [])
+    CMDExpr e -> case e of
+        Str t -> do
+            strRes <- lift (strLit t)
+            return (TextValue strRes, [])
+        Var v -> do
+            vres <- lookupVar v
+            return $ case vres of
+                RuntimeString s -> (TextValue s, [])
+                RuntimeBundle b -> (BundleRef v, [(v, b)])
+
 processRun :: (Exec m a) => ClInfo a -> [CMDEle CodaVal Text] -> RunCoda m a
-processRun = undefined
--- processRun inf cmd = do
---     prepCmd <- mapM prepCmdEle cmd
---     let (depCmd, deps) = unzip prepCmd
---     lift (RuntimeBundle <$> clRun inf (M.fromList (concat deps)) depCmd)
---     where
---         prepCmdEle :: (Exec m a) => CMDEle CodaVal Text -> StateT (RunEnv a) m (CodaCMDEle a, [(Text, a)])
---         prepCmdEle ele = case ele of
---             Plain t -> return (TextPlain t, [])
---             CMDExpr e -> case e of
---                 Str t -> do
---                     strRes <- lift (strLit t)
---                     return (TextValue strRes, [])
---                 Var v -> do
---                     vres <- lookupVar v
---                     return $ case vres of
---                         RuntimeString s -> (TextValue s, [])
---                         RuntimeBundle b -> (BundleRef v, [(v, b)])
+processRun inf cmd = do
+    prepCmd <- mapM prepCmdEle cmd
+    let (depCmd, deps) = unzip prepCmd
+    lift (RuntimeBundle <$> clRun inf (M.fromList (concat deps)) depCmd)
 
     
 getPath :: [Text] -> CodaVal -> (Text, [Text])

@@ -228,7 +228,7 @@ class (Monad m) => Exec m a where
     execRec :: TextMap a -> m a
 
 
-data ClInfo a = ClInfo {clname :: Text, clopt :: OptEnv a}
+data ClInfo a = ClInfo {clname :: Text, clopt :: [CodaCMDEle a]}
     deriving(Show, Read, Eq)
 
 
