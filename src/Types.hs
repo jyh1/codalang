@@ -74,26 +74,24 @@ instance Exec (RIO App) Text where
     clcmd <- view appClCmd
     execRes <- liftIO (clcmd execCmd)
     resid <- parseUUID execRes
-    appLog (Assign [EntOptEnv undefined, EntParen (EntUUID resid)] [EntVerbatim (T.pack cmdstr)])
+    appLog (Assign [EntOptEnv (clname vn), EntParen (EntUUID resid)] [EntVerbatim (T.pack cmdstr)])
     return resid
    where
     (uniqdm, cmdstr) = fromCodaEles depMap cmd
-    -- execCmd = ExecRun (M.toList uniqdm) cmdstr (consOptionList vn)
-    execCmd = ExecRun (M.toList uniqdm) cmdstr undefined
+    execCmd = ExecRun (M.toList uniqdm) cmdstr (consOptionList vn)
   clCat vn val = do
     clcmd <- view appClCmd
     res <- liftIO (clcmd execCmd)
     let resText = decodeUtf8Lenient res
-    appLog (Assign [EntOptEnv undefined] [EntVerbatim (tshow resText)])
+    appLog (Assign [EntOptEnv (clname vn)] [EntVerbatim (tshow resText)])
     return resText
     where
-      -- execCmd = ExecCat val (consOptionList vn)
-      execCmd = ExecCat val undefined
+      execCmd = ExecCat val (consOptionList vn)
   clMake vn ks = do
     clcmd <- view appClCmd
-    let makeCmd = ExecMake ks ""
+    let makeCmd = ExecMake ks (consOptionList vn)
     execRes <- liftIO (clcmd makeCmd) >>= parseUUID
-    appLog (Assign [EntOptEnv undefined] [EntUUID execRes])
+    appLog (Assign [EntOptEnv (clname vn)] [EntUUID execRes])
     return execRes
   strLit s = return s
   fromBundleName bn = return bn
@@ -143,7 +141,7 @@ instance LoadModule (StateT LoadState (RIO App)) where
           SysPath p -> B.readFile (T.unpack p)
           CodaBundle b -> do
             clcmd <- view appClCmd
-            liftIO (clcmd (ExecCat b ""))
+            liftIO (clcmd (ExecCat b []))
           URL l -> do
             r <- liftIO $ Wreq.get (T.unpack l)
             buffsize <- view (appOptions . to optionsBufferSize)
@@ -163,8 +161,8 @@ runParser s = evalStateT parse []
       parse :: StateT [Module] (RIO App) CodaVal
       parse = loadString s
 
--- consOptionList :: (ClInfo Text) -> ClOption
--- consOptionList (ClInfo vname optList) = ("name", vname) : optList
+consOptionList :: (ClInfo Text) -> [String]
+consOptionList (ClInfo vname optList) = ["--name", T.unpack vname] ++ (words $ snd (fromCodaEles mempty optList))
       
 parseUUID :: ByteString -> RIO App Text
 parseUUID res = do

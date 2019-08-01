@@ -144,9 +144,9 @@ data CodaResult = ResStr Text | ResBundle UUID
 
 type ClOption = [(Text, Text)]
 
-data Execute = ExecRun [(Text, Text)] String Text
-    | ExecCat Text Text
-    | ExecMake [(Text, Text)] Text
+data Execute = ExecRun [(Text, Text)] String [String]
+    | ExecCat Text [String]
+    | ExecMake [(Text, Text)] [String]
     deriving (Show, Read, Eq)
 
 buildPath :: [Text] -> Text
