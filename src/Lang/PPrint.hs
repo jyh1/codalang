@@ -104,13 +104,16 @@ instance CodaLangEnv PPPass PPrint where
     str s = ranno StrAnno (pretty (show s))
     cl optEnv cmd = do
             cmd' <- sequence cmd
+            optEnv' <- (traverse . cmdExpr) id optEnv
             case cmd' of
                 Run cs -> do
                     let 
-                        cs' = fromCMDEle annoExpr annoPlain <$> cs
+                        cs' = annoCMDEle <$> cs
+                        envEles = annoCMDEle <$> optEnv'
                         lpr = "@"
                         rpr = "@"
-                        runeles = align $ (lpr <> mconcat cs' <> rpr)
+                        envAnno = bool (mconcat envEles <> "#") mempty (null envEles)
+                        runeles = align $ (lpr <> envAnno <> mconcat cs' <> rpr)
                     ranno RunAnno (group runeles)
                 -- ClCat val -> val >>= (\v -> convert Nothing v TypeString)
                 -- ClMake ks -> dict (M.fromList ks) >>= (\v -> convert Nothing v TypeBundle)
@@ -135,11 +138,14 @@ instance CodaLangEnv PPPass PPrint where
     apply f arg = 
         return (PApply (toAnnoDocWithParen f) (argAnno (textMap (toAnnoDoc <$> arg))))
 
+annoCMDEle :: CMDEle PPrint Text -> AnnoDoc
+annoCMDEle = fromCMDEle annoExpr annoPlain
+
 annoPlain :: Text -> AnnoDoc
 annoPlain t = pretty (concat (map escChar s))
     where
         s = T.unpack t
-        escChar c = bool [c] (['\\', c]) (c == '\\' || c == '@' || c == '$')
+        escChar c = bool [c] (['\\', c]) (c == '\\' || c == '@' || c == '$' || c == '#')
 
 annoExpr :: PPrint -> AnnoDoc
 annoExpr d = "${" <> toAnnoDoc d <> "}"
