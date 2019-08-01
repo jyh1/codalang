@@ -180,8 +180,8 @@ commandExpr :: (TokenParsing m) => m ParseRes
 commandExpr = token (highlight StringLiteral runCommand)
     where
         plainLetter = satisfy (\c -> (c /= '@') && (c /= '$') && (c /= '\\') && (c /= '#') && (c > '\026'))
-        escapeChar = highlight EscapeCode $ char '\\' *> esc where
-        esc = char '$' <|> char '\\' <|> char '@' <|> char '#'
+        escapeChar = highlight EscapeCode $ char '\\' *> (esc <|> pure '\\')
+        esc = oneOf "$\\@#"
         plainText = (Plain . T.pack) <$> some (plainLetter <|> escapeChar)        
         embedParens = nesting . between (symbolic '{') (char '}')
         embedExpr = CMDExpr <$> (char '$' *> (varExpr <|> embedParens (token codaExpr)))
