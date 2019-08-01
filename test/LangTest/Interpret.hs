@@ -219,8 +219,8 @@ fromJRes t (res, blks) = do
     evalResJRes t res
 evalBlk :: JBlock JRes -> InterApp ()
 evalBlk (JBlock v opt cmd) = do
-    -- optVal <- (traverse . _2) evalStrJRes opt
-    let optVal = undefined
+    optRes <- traverse fromCMDJEle opt
+    let optVal = parseEle mempty <$> optRes
     res <- case cmd of
         JCat r -> do
             tres <- evalBunJRes r

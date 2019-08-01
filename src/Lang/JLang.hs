@@ -107,7 +107,7 @@ instance FromJSON JLang where
 
 instance Exec JCompileEnv JRes where
     clLit vn u = do
-        let blk = JBlock vn undefined (JLit (tshow u))
+        let blk = JBlock vn [] (JLit (tshow u))
         writeBlk blk
         return (JVariable vn)
     clCat clinfo res = makeJBlk clinfo (JCat res)
@@ -123,7 +123,7 @@ instance Exec JCompileEnv JRes where
 
 makeJBlk :: ClInfo JRes -> JCmd JRes -> JCompileEnv JRes
 makeJBlk (ClInfo vname optenv) cmd = do
-    let blk = JBlock vname undefined cmd
+    let blk = JBlock vname optenv cmd
     writeBlk blk
     return (JVariable vname)
 
