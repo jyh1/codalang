@@ -7,7 +7,7 @@
 module Lang.TypeCheck(typeCheck) where
 
 import           Control.Monad.State
-import           RIO                     hiding ( to )
+import           RIO                     hiding ( to, view, over )
 import           Control.Lens
 import qualified RIO.Text                      as T
 import qualified RIO.Map                       as M
@@ -87,14 +87,20 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
       where
         err = throwErr (TypeError UnDef (Var vn))
     str k = return (makeRes TypeString (Str k))
-    cl _ r@(Run es) = do
+    cl opt r@(Run es) = do
+        opt' <- (traverse . cmdExpr) id opt
+        _ <- (traverse . cmdExpr) isString opt'
         r' <- sequence r
         mapM_ notRecord r'
-        return (makeCl <$> (coSequenceT TypeBundle r'))
+        let optVals = over (traverse . cmdExpr) resVal opt'
+        return (Cl optVals <$> (coSequenceT TypeBundle r'))
         where
             notRecord t = case resType t of
                 ty@TypeRecord{} -> throwErr (TypeError (Mismatch TypeBundle ty) (resOrig t))
                 _ -> return ()
+            isString t = case resType t of
+                TypeString -> return ()
+                ty -> throwErr (TypeError (Mismatch TypeString ty) (resOrig t))
     cl _ (ClCat _) = error "Cat command during type check"
     dir val sub = case resType val of
         TypeString -> throwErr (TypeError (Mismatch TypeBundle TypeString) ast)
