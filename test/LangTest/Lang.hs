@@ -398,7 +398,10 @@ isCMD :: RCOCheck
 isCMD (Cl oe cmd ) = sequence_ [(traverse_ . cmdExpr) isValue oe, cmdTest]
   where 
     cmdTest = case cmd of
-      -- Run as -> sequence_ (isRunCmdEle <$> as)
+      Run as -> do
+        _ <- (traverse . cmdExpr) isRunCmdEle oe
+        _ <- (traverse . cmdExpr) isRunCmdEle as
+        return ()
       ClCat v -> isBundle v
       ClMake{} -> traverse_ isBundle cmd
 isCMD v = showError "isCMD" v
