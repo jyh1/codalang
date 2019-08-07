@@ -10,6 +10,7 @@ module Lang.Parser
     , codaParser
     , byteToUUID
     , loadByteString
+    , loadArgDic
     )
 where
 
@@ -295,6 +296,9 @@ codaExpr = token (suffixExpr)
 codaParser :: Parser ParseRes
 codaParser = unCodaParser (spaces *> codaExpr <* eof)
 
+typeDictParser :: Parser TypeDict
+typeDictParser = unCodaParser (spaces *> argTypeDict <* eof)
+
 loadFile :: (LoadModule m) => String -> m CodaVal
 loadFile f = parseModule (SysPath (T.pack f))
 
@@ -308,10 +312,17 @@ loadString inp = fromResult (parseString codaParser mempty inp)
 loadByteString :: (LoadModule m) => ByteString -> m CodaVal
 loadByteString inp = fromResult (parseByteString codaParser mempty inp)
 
+loadArgDic :: (LoadModule m) => String -> m TypeDict
+loadArgDic inp = runResult return (parseString typeDictParser mempty inp)
+
 fromResult :: (LoadModule m) => Result ParseRes -> m CodaVal
-fromResult res = case res of
-    Success a -> fromParseRes a
+fromResult = runResult fromParseRes
+
+runResult :: (LoadModule m) => (a -> m b) -> Result a -> m b
+runResult f res = case res of
+    Success a -> f a
     Failure xs -> parseError (show (_errDoc xs))
+
 
 -- parse UUID from command line output
 uuidParser :: Parser UUID
