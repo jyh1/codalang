@@ -180,7 +180,7 @@ parenExpr = highlight Special (token (parens inside)) <?> "paren expression"
 commandExpr :: (TokenParsing m) => m ParseRes
 commandExpr = token (highlight StringLiteral runCommand)
     where
-        plainLetter = satisfy (\c -> (c /= '@') && (c /= '$') && (c /= '\\') && (c /= '#') && (c > '\026'))
+        plainLetter = satisfy (\c -> (c /= '@') && (c /= '$') && (c /= '\\') && (c /= '#'))
         escapeChar = highlight EscapeCode $ char '\\' *> (esc <|> pure '\\')
         esc = oneOf "$\\@#"
         plainText = (Plain . T.pack) <$> some (plainLetter <|> escapeChar)        
