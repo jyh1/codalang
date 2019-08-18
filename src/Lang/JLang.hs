@@ -9,7 +9,6 @@ module Lang.JLang where
 
 import Lang.Types
 import Lang.Interpret
-import Types
 
 import RIO
 import Control.Monad.Writer
