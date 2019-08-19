@@ -18,6 +18,7 @@ import           Lang.Types
 
 import           RIO                     hiding ( try )
 import qualified RIO.Text                      as T
+import           RIO.List (headMaybe)
 import qualified RIO.Map                       as M
 import           Text.Parser.Combinators
 import           Text.Parser.Token
@@ -26,6 +27,7 @@ import           Text.Parser.Token.Highlight
 import           Text.Trifecta
 import           Data.Char (isSpace, isLetter, isDigit)
 import           Control.Lens (unto)
+import           Text.Trifecta.Delta
 
 data PAssign = PLetVar Text | PLetFun Text TypeDict
     deriving (Show, Read, Eq, Ord)
@@ -321,7 +323,16 @@ fromResult = runResult fromParseRes
 runResult :: (LoadModule m) => (a -> m b) -> Result a -> m b
 runResult f res = case res of
     Success a -> f a
-    Failure xs -> parseError (show (_errDoc xs))
+    Failure xs -> (uncurry parseError) (fromMaybe (0, 0) dlt) (show (_errDoc xs))
+        where
+            dlt = do
+                d <- headMaybe (_errDeltas xs)
+                let col = column d
+                    line = case d of
+                            Lines l _ _ _ -> l
+                            _ -> 0
+                return (line, col)
+            
 
 
 -- parse UUID from command line output

@@ -243,4 +243,4 @@ moduleTxt m = case m of
 
 class (Monad m) => LoadModule m where
     loadModule :: Module -> (ByteString -> m a) -> m a
-    parseError :: String -> m a
+    parseError :: Int64 -> Int64 -> String -> m a

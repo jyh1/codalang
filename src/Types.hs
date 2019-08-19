@@ -149,7 +149,7 @@ instance LoadModule (StateT LoadState (RIO App)) where
         res <- app content
         loadStack %= tail
         return res
-  parseError e = do
+  parseError _ _ e = do
     loadTxt <- use (to stackInf)
     logError ("During parsing: " <> display loadTxt)
     logError (display (T.pack e))
