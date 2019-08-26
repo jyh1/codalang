@@ -105,8 +105,25 @@ data CodaType = TypeString | TypeBundle | TypeRecord TypeDict | TypeLam TypeDict
     deriving (Eq, Ord, Read, Show, Generic)
 
 instance ToJSON CodaType where
-    toEncoding = genericToEncoding defaultOptions
+    toJSON t = case t of
+        TypeString -> "string"
+        TypeBundle -> "bundle"
+        TypeRecord rt -> object ["type" .= ("record" :: String), "content" .= rt]
+        TypeLam arg body -> object ["type" .= ("lambda" :: String), "arg" .= arg, "body" .= body]
+    toEncoding t = case t of
+        TypeString -> toEncoding ("string" :: String)
+        TypeBundle -> toEncoding ("bundle" :: String)
+        TypeRecord rt -> pairs ("type" .= ("record" :: String) <> "content" .= rt)
+        TypeLam arg body -> pairs ("type" .= ("lambda" :: String) <> "arg" .= arg <> "body" .= body)
 instance FromJSON CodaType where
+    parseJSON (Object v) = do
+        tag <- v .: "type"
+        case tag of
+            String "record" -> TypeRecord <$> (v .: "content")
+            String "lambda" -> TypeLam <$> (v .: "arg") <*> (v .: "body")
+    parseJSON (String t) = case t of
+        "string" -> return TypeString
+        "bundle" -> return TypeBundle
 
 containLambda :: CodaType -> Bool
 containLambda ty = case ty of
