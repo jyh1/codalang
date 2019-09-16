@@ -17,7 +17,7 @@ CodaLang is a DSL for submitting computation command (run bundle) to [CodaLab](h
 
 ## Getting started
 
-The easiest way to experiment with CodaLang is through the [demo web app](), it will compile the input CodaLang expression to shell script based on CodaLang CLI. For actually using CodaLang, check out the [Workflow](), a LabVIEW-like visual programming interface for CodaLab.
+The easiest way to experiment with CodaLang is through the [demo web app](http://13.82.168.247/demo/codalang/), it will compile the input CodaLang expression to shell script based on CodaLang CLI. For actually using CodaLang, check out the [Workflow](), a LabVIEW-like visual programming interface for CodaLab.
 
 ## Build
 This package is intended to be used as a library, but it comes with a minimal CLI for interpreting CodaLang file through the system `cl` command. It can be built with [stack](https://tech.fpcomplete.com/haskell/get-started)
@@ -27,7 +27,8 @@ stack build && stack test
 
 ## Tutorial
 
-> **_Tip:_** You can copy/paste the example programs from this tutorial to the [demo web app]() to see the actual compiled results.
+> **_Tip:_** You can copy/paste the example programs from this tutorial to the [demo web app](http://13.82.168.247/demo/codalang/) to see the actual compiled results.
+
 > **_Note:_** This tutorial assumes you already have a working knowledge about CodaLab. If not, a quick start guide can be found [here](https://github.com/codalab/worksheets-examples).
 
 
@@ -47,7 +48,7 @@ The program structure is simple. It contains a `let` expression, which introduce
 
 In this example, the "return value" is a `run expression`, which is enclosed by a pair of `@` symbol. The syntax is similar to a string template, you can use the `$` sign to refer to the CodaLang variables that are in scope. However, unlike string template, those variables will NOT be directly inlined with their contents, the whole expression will be translated to a `cl run` command with correct dependencies. The above example will become something like:
 ```shell
-cl run  --name Sort-3  Sort-a-1:0x3b5f831f09f04a22bcd3020b7a1cb69c Sort-sort-2:0xd4c5712c156f41e48e6400f05cc5441c ' python Sort-sort-2 < Sort-a-1 '
+cl run  --name codalang-3  a-1:0x3b5f831f09f04a22bcd3020b7a1cb69c sort-2:0xd4c5712c156f41e48e6400f05cc5441c ' python sort-2 < a-1 '
 ```
 You probably have figured out that the two long hexadecimal number prefixed with `0x` are bundle UUIDs. Indeed, they are `bundle literal` expressions and currently the only way to refer to existing bundles in the CodaLab. 
 
@@ -68,9 +69,9 @@ In the definition of `a2`, we used a path separator `/`. It means exactly what y
 
 The corresponding shell script of the above program:
 ```shell
-bundle_0=$(cl run  --name Example2-a2-3  Example2-a-1:0x3b5f831f09f04a22bcd3020b7a1cb69c 'cat Example2-a-1 Example2-a-1')
-bundle_1=$(cl run  --name Example2-a4-5  Example2-a2-4:$bundle_0/stdout 'cat Example2-a2-4 Example2-a2-4')
-bundle_2=$(cl run  --name Example2-6  Example2-a4-5:$bundle_1 Example2-sort-2:0xd4c5712c156f41e48e6400f05cc5441c ' python Example2-sort-2 < Example2-a4-5/stdout ')
+bundle_0=$(cl run  --name a2-3  a-1:0x3b5f831f09f04a22bcd3020b7a1cb69c 'cat a-1 a-1')
+bundle_1=$(cl run  --name a4-5  a2-4:$bundle_0/stdout 'cat a2-4 a2-4')
+bundle_2=$(cl run  --name codalang-6  a4-5:$bundle_1 sort-2:0xd4c5712c156f41e48e6400f05cc5441c ' python sort-2 < a4-5/stdout ')
 ```
  
 ### Function
@@ -90,8 +91,8 @@ In the calling side, we need to provide a dictionary-like structure or so called
 
 The compiled script of this example:
 ```shell
-bundle_0=$(cl run  --name Function-a2-3  Function-a2-1:0x3b5f831f09f04a22bcd3020b7a1cb69c 'cat Function-a2-1 Function-a2-1')
-bundle_1=$(cl run  --name Function-5  Function-a2-4:$bundle_0/stdout 'cat Function-a2-4 Function-a2-4')
+bundle_0=$(cl run  --name a2-3  a2-1:0x3b5f831f09f04a22bcd3020b7a1cb69c 'cat a2-1 a2-1')
+bundle_1=$(cl run  --name codalang-5  a2-4:$bundle_0/stdout 'cat a2-4 a2-4')
 ```
 
 A few extra notes: CodaLang is designed to support the execution computation graphs of `Workflow`(https://github.com/jyh1/workflow). The `function` in CodaLang is closely modelled as a computation node like in [Galaxy](https://galaxyproject.org) or LabVIEW, with named input ports and output ports.
@@ -106,7 +107,7 @@ We can further specify options for `cl run` in the `run expression`.
 ```
 Option specifications and command are separated by `#`. The above example will be compiled to:
 ```shell
-bundle_0=$(cl run  --name NewTool-1  --request-docker-image codalab/default --request-gpus 2   'echo Hello World')
+bundle_0=$(cl run  --name codalang-1  --request-docker-image codalab/default --request-gpus 2   'echo Hello World')
 ```
 
 ### String Expression
@@ -117,7 +118,7 @@ let lr = "1e-5" in @ echo $lr@
 ```
 Compiled to:
 ```shell
-bundle_0=$(cl run  --name NewTool-1   ' echo 1e-5')
+bundle_0=$(cl run  --name codalang-1   ' echo 1e-5')
 ```
 
 String expression will be inlined directly. Special shell characters like `$`, white space and etc will be quoted. String expression has type `string`, which could be passed as argument.
@@ -133,7 +134,7 @@ in
 ```
 Compiled result:
 ```
-bundle_0=$(cl run  --name StringQuote-1  --request-gpus=3   ' awk \'($1 > 5){print $2}\' ')
+bundle_0=$(cl run  --name codalang-1  --request-gpus=3   ' awk \'($1 > 5){print $2}\' ')
 ```
 
 ### Record
@@ -166,8 +167,8 @@ In this example, we `multiply` returns a record with two values: `double` and `t
 CodaLang acts like a "lazy" language, which means only the necessary commands that are required to compute the final result will be compiled. For example, even thought `multiply` is called twice, only two commands that are required in the final result are generated:
 
 ```
-bundle_0=$(cl run  --name NewTool-doubled-2  NewTool-data-1:0x3b5f831f09f04a22bcd3020b7a1cb69c 'cat NewTool-data-1 NewTool-data-1')
-bundle_1=$(cl run  --name NewTool-7  NewTool-doubled-4:$bundle_0/stdout 'cat NewTool-doubled-4 NewTool-doubled-4 NewTool-doubled-4')
+bundle_0=$(cl run  --name doubled-2  data-1:0x3b5f831f09f04a22bcd3020b7a1cb69c 'cat data-1 data-1')
+bundle_1=$(cl run  --name codalang-7  doubled-4:$bundle_0/stdout 'cat doubled-4 doubled-4 doubled-4')
 ```
 
 ### Types

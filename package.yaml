@@ -1,10 +1,10 @@
 name:                codalang
 version:             0.1.0.0
-github:              githubuser/codalang
+github:              jyh1/codalang
 license:             BSD3
-author:              Author name here
-maintainer:          example@example.com
-copyright:           2019 Author name here
+author:              Yonghao Jin
+maintainer:          yonghao.jyh1@gmail.com
+copyright:           2019 Yonghao Jin
 
 extra-source-files:
 - README.md
