@@ -17,7 +17,7 @@ CodaLang is a DSL for submitting computation command (run bundle) to [CodaLab](h
 
 ## Getting started
 
-The easiest way to experiment with CodaLang is through the [demo web app](http://13.82.168.247/demo/codalang/), it will compile the input CodaLang expression to shell script based on CodaLang CLI. For actually using CodaLang, check out the [Workflow](), a LabVIEW-like visual programming interface for CodaLab.
+The easiest way to experiment with CodaLang is through the [demo web app](http://13.82.168.247/demo/codalang/), it will compile the input CodaLang expression to shell script based on CodaLang CLI. For actually using CodaLang, check out the [Workflow](https://github.com/jyh1/workflow), a LabVIEW-like visual programming interface for CodaLab.
 
 ## Build
 This package is intended to be used as a library, but it comes with a minimal CLI for interpreting CodaLang file through the system `cl` command. It can be built with [stack](https://tech.fpcomplete.com/haskell/get-started)
