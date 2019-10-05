@@ -115,7 +115,7 @@ withOptVar opt varres app = do
     return res
 -- lang rco
 runRCO :: CodaVal -> CodaVal
-runRCO cdvl = foldr (\(k,v) -> (Let (Variable k) v)) bndl binds
+runRCO cdvl = foldr (\(k,v) -> (Let k v)) bndl binds
   where
     foldApp :: RCOPass Bundle
     foldApp        = foldCoda cdvl >>= rcoValue >>= toRetVal
@@ -238,13 +238,9 @@ instance CodaLangEnv RCOPass RCORes where
         rcocmd <- traverse (>>= rcoLet) cmd
         return (RCOCmd optEnv rcocmd)
     dir val subdir = toSubDir val subdir
-    clet af val body = case af of
-        Variable vname -> do
-            newns <- withLocal vname (val >>= rcoLet)
-            withVar vname newns body
-        OptionVar vname -> do
-            optval <- val >>= rcoValue
-            withOptVar vname optval body
+    clet vname val body = do
+        newns <- withLocal vname (val >>= rcoLet)
+        withVar vname newns body
     -- deprecate
     -- convert typeTag val t = do
     --     optEnv <- use (optvar . to M.toList)

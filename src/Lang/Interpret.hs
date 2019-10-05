@@ -32,7 +32,7 @@ runCodaRes cv = case cv of
     Dict d -> do
         evalRec <- mapM runCodaRes d
         lift (execRec evalRec)
-    Let (Variable v) val body -> do
+    Let v val body -> do
         res <- prepLetRhs v val
         at v ?= res
         runCodaRes body

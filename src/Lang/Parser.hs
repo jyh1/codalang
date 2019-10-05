@@ -65,8 +65,8 @@ instance TokenParsing CodaParser where
 fromPLet :: (LoadModule m) => PAssign -> ParseRes -> m CodaVal -> m CodaVal
 fromPLet pa val body = do
     let var = case pa of
-            PLetVar t -> Variable t
-            PLetFun f _ -> Variable f
+            PLetVar t -> t
+            PLetFun f _ -> f
     valres <- fromParseRes val
     let letval = case pa of
             PLetFun _ args -> Lambda args valres

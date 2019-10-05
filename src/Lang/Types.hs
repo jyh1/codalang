@@ -59,17 +59,10 @@ type CodaCmd = Cmd CodaVal
 type Env = [(Text, Text)]
 
 -- assign to let
-data AssignForm = Variable VarName
-    | OptionVar VarName
-    deriving (Eq, Ord, Read, Show, Generic)
-instance ToJSON AssignForm where
-    toEncoding = genericToEncoding defaultOptions
-instance FromJSON AssignForm
+type AssignForm = Text
 
 printAssignForm :: AssignForm -> Text
-printAssignForm af = case af of
-    Variable v -> v
-    OptionVar v -> "--" <> v
+printAssignForm af = af
 
 type OptEnv a = [CMDEle a Text]
 -- CodaLang AST

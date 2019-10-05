@@ -111,13 +111,10 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         where
             ast = resOrig val
             tagType t = fmapT t (`Dir` sub) val
-    clet af val body = do
+    clet vn val body = do
         valRes <- val
-        bodyRes <- case af of
-            Variable vn -> withVar vn (Var vn <$ valRes) body
-            OptionVar{} -> 
-                expectType TypeString (resType valRes) (resOrig valRes) >> body
-        return (liftRes2 (Let af) valRes bodyRes)
+        bodyRes <- withVar vn (Var vn <$ valRes) body
+        return (liftRes2 (Let vn) valRes bodyRes)
 
     -- deprecated
     convert _ val vt = bool castErr doConvert isConvertable
