@@ -78,10 +78,9 @@ instance CodaLangEnv InterApp CodaTestRes where
         res <- execcmd
         return res
     dir val sub = return $ makeDir val sub
-    clet af val body = do
+    clet varn val body = do
         valres <- val
-        case af of
-            Variable varn -> withVar varn valres body
+        withVar varn valres body
             -- OptionVar varn -> do
             --     origin <- use optionvars
             --     optionvars %= (M.insert varn valres)

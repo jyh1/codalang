@@ -156,23 +156,12 @@ randClEle n ts = randCmd
 randLet :: CodaType -> GenEnv CodaVal
 randLet t = do
   varName <- lift randAssign
-  let bodyGen = case varName of
-        Variable var -> do
-          (vt, val) <- halfDepth randCodaVal
-          body <- withVar var vt (randTree t)
-          return (val, body)
-        _ -> do
-          val <- halfDepth (randTree TypeString)
-          body <- randTree t
-          return (val, body)
-  (val, body) <- decDepth bodyGen
+  (vt, val) <- halfDepth randCodaVal
+  body <- withVar varName vt (randTree t)
   return (Let varName val body)
   where
     randAssign :: Gen AssignForm
-    randAssign = frequency [
-        (5, Variable <$> genVar)
-      -- , (5, OptionVar <$> genVar)
-      ]
+    randAssign = genVar
 
 -- disable generate convert node
 randConvert :: CodaType -> GenEnv CodaVal
@@ -357,7 +346,7 @@ l = Lit . UUID
 d :: CodaVal -> [Text] -> CodaVal
 d = foldl Dir
 clet :: CodaVal -> [(Text, CodaVal)] -> CodaVal
-clet = foldr (\(k, v) -> Let (Variable k) v)
+clet = foldr (\(k, v) -> Let k v)
 tmpN :: Int -> Text
 tmpN n = tmpName <> "-" <> tshow n
 tmpNV :: Int -> CodaVal
@@ -428,7 +417,7 @@ isConvert c
   | True = showError "isConvert" c
 
 isLet :: RCOCheck
-isLet c@(Let (Variable _) val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert, isRecord, const (showError "isLet" c)]), isRCO body]
+isLet c@(Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert, isRecord, const (showError "isLet" c)]), isRCO body]
 isLet v = showError "isLet" v
 
 isRecord :: RCOCheck
