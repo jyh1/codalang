@@ -1,6 +1,6 @@
 # CodaLang, a domain specific language for [CodaLab](https://worksheets.codalab.org/) <!-- omit in toc -->
 
-CodaLang is a DSL for submitting computation command (run bundle) to [CodaLab](https://worksheets.codalab.org/). Originally designed for [Workflow](https://github.com/jyh1/workflow), it mainly provides high level construct for defining reusable functions upon the regular [CodaLab CLI](https://codalab-worksheets.readthedocs.io/en/latest/CLI-Reference/).
+CodaLang is a DSL for submitting computation commands to [CodaLab](https://worksheets.codalab.org/). Originally designed for [Workflow](https://github.com/jyh1/workflow), it provides a high level construct for defining reusable functions upon the CodaLab [CLI](https://codalab-worksheets.readthedocs.io/en/latest/CLI-Reference/).
 
 ## Table of contents
 - [Table of contents](#table-of-contents)
