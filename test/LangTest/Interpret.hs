@@ -61,7 +61,7 @@ evalCmdEle = fromCMDEle id StrRes
 evalRunCmdEle :: CMDEle CodaTestRes Text -> [CodaTestRes]
 evalRunCmdEle = fromCMDEle rmDict (\t -> [StrRes t])
     where
-        rmDict (DictRes _) = []
+        rmDict (DictRes _) = [StrRes ""]
         rmDict other = [other]
 
 instance CodaLangEnv InterApp CodaTestRes where

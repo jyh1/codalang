@@ -70,7 +70,7 @@ prepLetRhs vn cv = case cv of
     Lit u -> lift (RuntimeBundle <$> clLit vn u)
     _     -> error "Impossible happened: not RCO expr in let assignment"
 
-prepCmdEle :: (Exec m a) => CMDEle CodaVal Text -> StateT (RunEnv a) m (CodaCMDEle a, [(Text, a)])
+prepCmdEle :: (Exec m a, Ord a) => CMDEle CodaVal Text -> StateT (RunEnv a) m (CodaCMDEle a, [(Text, a)])
 prepCmdEle ele = case ele of
     Plain t -> return (TextPlain t, [])
     CMDExpr e -> case e of
@@ -82,8 +82,12 @@ prepCmdEle ele = case ele of
             return $ case vres of
                 RuntimeString s -> (TextValue s, [])
                 RuntimeBundle b -> (BundleRef v, [(v, b)])
+        Dict bdict -> do
+            bundles <- mapM runCodaRes bdict
+            emptyPlaceHolder <- lift (strLit "")
+            return (TextValue emptyPlaceHolder, M.toList bundles)
 
-processRun :: (Exec m a) => ClInfo a -> [CMDEle CodaVal Text] -> RunCoda m a
+processRun :: (Exec m a, Ord a) => ClInfo a -> [CMDEle CodaVal Text] -> RunCoda m a
 processRun inf cmd = do
     prepCmd <- mapM prepCmdEle cmd
     let (depCmd, deps) = unzip prepCmd
