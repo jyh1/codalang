@@ -58,6 +58,12 @@ instance LocalVar (CodaInterEnv CodaTestRes) InterApp CodaTestRes
 evalCmdEle :: CMDEle CodaTestRes Text -> CodaTestRes
 evalCmdEle = fromCMDEle id StrRes
 
+evalRunCmdEle :: CMDEle CodaTestRes Text -> [CodaTestRes]
+evalRunCmdEle = fromCMDEle rmDict (\t -> [StrRes t])
+    where
+        rmDict (DictRes _) = []
+        rmDict other = [other]
+
 instance CodaLangEnv InterApp CodaTestRes where
     lit t = return (BunRes (tshow t))
     str = return . StrRes
@@ -70,7 +76,7 @@ instance CodaLangEnv InterApp CodaTestRes where
         let optEles = evalCmdEle <$> optEnvs
             execcmd = case cmd of
                 Run cmd' -> do
-                    let cmdEles = evalCmdEle <$> cmd'
+                    let cmdEles = concatMap evalRunCmdEle cmd'
                     oe <- makeLog optEles (LogRun cmdEles)
                     return (RunRes oe cmdEles)
                 ClCat val -> runCat optEles val

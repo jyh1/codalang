@@ -130,7 +130,11 @@ randDir t = do
       return (ty, newN)
 
 randCl :: GenEnv CodaVal
-randCl = liftA2 Cl (randClEle 0 [TypeString]) (Run <$> randClEle 1 [TypeBundle, TypeString])
+randCl = do
+  opts <- randClEle 0 [TypeString]
+  recBundle <- lift (randTypeDicOf (return TypeBundle))
+  runcmd <- Run <$> randClEle 1 [TypeBundle, TypeString, TypeRecord recBundle]
+  return (Cl opts runcmd)
 
 randClEle :: Int -> [CodaType] -> GenEnv (OptEnv CodaVal)
 randClEle n ts = randCmd
@@ -260,8 +264,11 @@ randType =
     , (3, liftA2 TypeLam randTypeDic randType)
   ]
 randDicKey = frequency ((1, randVarName) : [(2, pure ("key" <> tshow i)) | i <- [1..3]])
-randDicEle = liftA2 (curry id) randDicKey randType
-randTypeDic = M.fromList <$> (resize 3 (listOf randDicEle))
+randDicEleOf rt = liftA2 (curry id) randDicKey rt
+-- randDicEle = randDicEleOf randType
+randTypeDicOf rt = M.fromList <$> (resize 3 (listOf (randDicEleOf rt)))
+randTypeDic = randTypeDicOf randType
+
 
 randNoTypeLam :: Gen CodaType
 randNoTypeLam = suchThat randType notLambda

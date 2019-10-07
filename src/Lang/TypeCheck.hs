@@ -91,13 +91,18 @@ instance CodaLangEnv TCPass (TCRes CodaVal) where
         opt' <- (traverse . cmdExpr) id opt
         _ <- (traverse . cmdExpr) isString opt'
         r' <- sequence r
-        mapM_ notRecord r'
+        mapM_ isCmdEle r'
         let optVals = over (traverse . cmdExpr) resVal opt'
         return (Cl optVals <$> (coSequenceT TypeBundle r'))
         where
-            notRecord t = case resType t of
-                ty@TypeRecord{} -> throwErr (TypeError (Mismatch TypeBundle ty) (resOrig t))
+            isCmdEle t = case resType t of
+                -- bundle or string or record of bundle
+                ty@TypeLam{} -> throwErr (TypeError (Mismatch TypeBundle ty) (resOrig t))
+                TypeRecord tr -> mapM_ (isBundle (resOrig t)) tr
                 _ -> return ()
+            isBundle orig t = case t of
+                TypeBundle -> return ()
+                _ -> throwErr (TypeError (Mismatch TypeBundle t) orig)
             isString t = case resType t of
                 TypeString -> return ()
                 ty -> throwErr (TypeError (Mismatch TypeString ty) (resOrig t))
