@@ -120,13 +120,11 @@ rcoSpec = describe "RCO(remove_complex_operation)" $ do
             letdir k v = clet (dirval (fromString k)) [(T.pack k, v)]
         simpRCOTest (letdir "a" 1) (letdir "a-1" 1)
         simpRCOTest (letdir "a" (d 1 ["m"])) (clet (dirval "a-2") [("a-1", 1), ("a-2", d "a-1" ["m"])])
-    -- it "run_command" $ do
-    --     let simpRun2 k1 k2 = r [s "aa", d k1 ["c", "d"], s "e", k2]
-    --         simpRun k = simpRun2 k k
-    --     simpRCOTest (simpRun 1) (clet (tmpNV 3) [(tmpN 1, 1), (tmpN 2, 1), (tmpN 3, simpRun2 (tmpNV 1) (tmpNV 2))])
-    --     simpRCOTest (clet (simpRun "bb") [("bb", 2)]) ((clet (tmpNV 2) [("bb-1", 2), (tmpN 2, (simpRun "bb-1"))]))
-    --     simpRCOTest (clet (simpRun "k") [("k", d 2 ["a"])]) 
-    --         (clet (tmpNV 3) [("k-1", 2 ), ("k-2", d "k-1" ["a"]), (tmpN 3, simpRun "k-2")])
+    it "run_command_with_record" $ do
+        let ex1 = doParse "@${{a: 0x11, b: 0x22}} ls a@"
+            ex2 = doParse "let x = {a: 0x1, b: 0x2} in @ ls a $x@"
+        simpRCOTest ex1 (doParse "let codalang-1=0x11; codalang-2 = 0x22; codalang-3 = @${{a: codalang-1, b: codalang-2}} ls a@ in codalang-3")
+        simpRCOTest ex2 (doParse "let x-1=0x1; x-2 = 0x2; codalang-3=@ ls a ${{a: x-1, b: x-2}}@ in codalang-3")
     it "random_gen_RCO" $ property $
         quickCheckWith stdArgs{ maxSuccess = 300 }(\(RandCodaRCO _ cv) -> checkER cv)
     it "same_result_after_RCO" $ property $

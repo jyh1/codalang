@@ -388,19 +388,7 @@ isValue :: RCOCheck
 isValue x = msum [isBundle x, isStr x, showError "isValue" x]
 
 isRunCmdEle :: RCOCheck
-isRunCmdEle x = msum [isVar x, isStr x, showError "isValue" x]
-
-isCMD :: RCOCheck
-isCMD (Cl oe cmd ) = sequence_ [(traverse_ . cmdExpr) isValue oe, cmdTest]
-  where 
-    cmdTest = case cmd of
-      Run as -> do
-        _ <- (traverse . cmdExpr) isRunCmdEle oe
-        _ <- (traverse . cmdExpr) isRunCmdEle as
-        return ()
-      ClCat v -> isBundle v
-      ClMake{} -> traverse_ isBundle cmd
-isCMD v = showError "isCMD" v
+isRunCmdEle x = msum [isVar x, isStr x, isRecord x, showError "isValue" x]
 
 isDir :: RCOCheck
 isDir (Dir v _) = isBundle v
@@ -423,21 +411,11 @@ isConvert c
   -- | trace (T.pack $ testPPrint c) False = return ()
   | True = showError "isConvert" c
 
-isLet :: RCOCheck
-isLet c@(Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert, isRecord, const (showError "isLet" c)]), isRCO body]
-isLet v = showError "isLet" v
 
 isRecord :: RCOCheck
 isRecord (Dict d) = mapM_ isValue d
 isRecord v = showError "isRecord" v
 
-isRCO :: RCOCheck
-isRCO v = isValue v `mplus` isLet v
-
-checkRCO :: CodaVal -> Bool
-checkRCO v = case isRCO v of 
-  Right _ -> True
-  Left s -> error s
 
 -- elminate record check
 isERRet :: RCOCheck
@@ -448,7 +426,11 @@ isERRes :: RCOCheck
 isERRes (Let _ val body) = sequence_ [msum (($ val) <$> [isCMD, isDir, isLit, isStr, isConvert]), isERRes body]
   where
     isCMD :: RCOCheck
-    isCMD (Cl _ cmd) = traverse_ isValue cmd
+    isCMD (Cl _ cmd) = case cmd of
+      Run runeles -> do 
+        _ <- (traverse . cmdExpr) isRunCmdEle runeles
+        return ()
+      _ -> traverse_ isBundle cmd
     isCMD v = showError "isCMD" v
     isConvert c@(Convert _ v ty) = case ty of
       TypeString -> isValue v
