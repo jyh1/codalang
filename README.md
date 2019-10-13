@@ -7,7 +7,7 @@ CodaLang is a DSL for workflow management on CodaLab. Originally designed for [W
 - [Getting started](#getting-started)
 - [Tutorial](#tutorial)
   - [Bundle as a value](#bundle-as-a-value)
-    - [Run Expression](#run-expression)
+  - [Run Expression](#run-expression)
   - [Let Expression](#let-expression)
   - [Defining a Pipeline](#defining-a-pipeline)
   - [Function](#function)
@@ -37,7 +37,7 @@ CodaLang is all about the `bundle`. In other programming language, you probably 
 
 It refers to this [bundle](https://worksheets.codalab.org/bundles/0x3b5f831f09f04a22bcd3020b7a1cb69c) in the public CodaLab server. The above example is a bona fide CodaLang expression, although a rather boring one. It will get compiled, but no command will be generated, because it is just a constant expression.
 
-#### Run Expression
+### Run Expression
 You can do something more interesting with a `run expression`. The Hello World program for CodaLang might look like:
 ```
 @echo Hello World@
@@ -155,6 +155,7 @@ evaluated to a bundle value, although technically it doesn't have a UUID directl
 
 
 Take a look at the following examples to see how the dependencies are generated based on the value embedded in `run`:
+
 |  Expression |  Generated Dependency  |
 |:------------------:|:-----------:|
 | @cat ${0xf321}/stdout@ | a:0xf321 |
@@ -274,6 +275,7 @@ If it is a string, we just need to inline it in the command.
 It is necessary for CodaLang to keep track of the type to behave correctly.
 
 Types of some example expressions:
+
 |  Expression |  Type  |
 |:------------------:|:-----------:|
 | "a b c d" | string |
